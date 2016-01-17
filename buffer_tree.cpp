@@ -1,8 +1,36 @@
 #include "buffer_tree.h"
 
+namespace
+{
+struct node_add_visitor_t : boost::static_visitor<void>
+{
+    node_add_visitor_t(const storage_t & storage, std::int64_t x)
+        : storage(storage)
+        , x(x)
+    {}
+
+    void operator () (const storage_t::leaf_t & leaf) const
+    {
+        // TODO: add x to elements
+        // TODO: update node on filesystem
+    }
+
+    void operator () (storage_t::node_t & node) const
+    {
+        node.pending_add.push(x);
+        // TODO: update node on filesystem
+    }
+
+private:
+    const storage_t & storage;
+    std::int64_t x;
+};
+}
+
 void buffer_tree_t::add(std::int64_t x)
 {
-    // TODO
+    storage_t::any_node_t node = storage.load_node(storage.root_node());
+    boost::apply_visitor(node_add_visitor_t(storage, x), node);
 }
 
 storage_t::any_node_t storage_t::load_node(const storage_t::node_id & id) const
@@ -56,8 +84,12 @@ visitor_result_t node_visitor_t::operator () (storage_t::node_t & node) const
     if (res.was_removed)
         node.children.pop_front();
 
-    // TODO: check if there are no children left
     bool was_removed = false;
+    if (node.children.empty())
+    {
+        storage.delete_node(node.id);
+        was_removed = true;
+    }
 
     // TODO: update node on filesystem
 
