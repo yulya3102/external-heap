@@ -8,14 +8,22 @@
 
 #include "buffer_tree.h"
 
-#define BLOCK_SIZE 4096
-#define ELEMENT_SIZE 8
-#define SMALL_STORAGE_SIZE (4 * BLOCK_SIZE)
-#define SMALL_STORAGE_ELEMENTS (SMALL_STORAGE_SIZE / ELEMENT_SIZE)
-
 struct heap_t
 {
+    struct options_t
+    {
+        options_t(size_t block_size = 4096,
+                  size_t small_storage_blocks = 4);
+
+        size_t block_size,
+               element_size,
+               small_storage_size,
+               small_storage_elements;
+    };
+
     heap_t();
+    heap_t(const options_t & options);
+
     void add(std::int64_t x);
     std::int64_t remove_min();
 
@@ -28,4 +36,6 @@ private:
     std::vector<std::int64_t> small_elements;
     boost::optional<std::int64_t> small_max;
     buffer_tree_t big_elements;
+
+    const options_t options;
 };

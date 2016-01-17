@@ -4,10 +4,11 @@
 
 #include <algorithm>
 
-heap_t::heap_t()
-{
+heap_t::heap_t(const heap_t::options_t & options)
+    : options(options)
+{}
 
-}
+heap_t::heap_t() {}
 
 void heap_t::add(int64_t x)
 {
@@ -32,7 +33,7 @@ void heap_t::small_add(int64_t x)
     small_elements.push_back(-x);
     std::push_heap(small_elements.begin(), small_elements.end());
 
-    if (small_elements.size() >= SMALL_STORAGE_ELEMENTS)
+    if (small_elements.size() >= options.small_storage_elements)
     {
         big_elements.add(*small_max);
         small_elements.erase(std::find(small_elements.begin(), small_elements.end(), small_max));
@@ -67,3 +68,11 @@ void heap_t::update_small_max()
     else
         small_max = -*std::min_element(small_elements.begin(), small_elements.end());
 }
+
+
+heap_t::options_t::options_t(size_t block_size, size_t small_storage_blocks)
+    : block_size(block_size)
+    , element_size(sizeof(std::int64_t))
+    , small_storage_size(block_size * small_storage_blocks)
+    , small_storage_elements(small_storage_size / element_size)
+{}
