@@ -14,19 +14,17 @@ void heap_t::add(int64_t x)
     if (is_small(x))
         small_add(x);
     else
-    {
-        // TODO: add x to "big" elements
-    }
+        big_elements.add(-x);
 }
 
 int64_t heap_t::remove_min()
 {
     if (small_elements.empty())
     {
-        // TODO: take from "big" elements
+        big_elements.fetch_block(std::back_inserter(small_elements));
+        std::make_heap(small_elements.begin(), small_elements.end());
     }
-    else
-        return small_remove();
+    return small_remove();
 }
 
 void heap_t::small_add(int64_t x)
@@ -36,7 +34,8 @@ void heap_t::small_add(int64_t x)
 
     if (small_elements.size() >= SMALL_STORAGE_ELEMENTS)
     {
-        // TODO: move small_max to "big" elements
+        big_elements.add(*small_max);
+        small_elements.erase(std::find(small_elements.begin(), small_elements.end(), small_max));
     }
 
     update_small_max();

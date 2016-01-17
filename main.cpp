@@ -2,10 +2,14 @@
 
 #include "external_heap.h"
 
-TEST(empty, size)
+TEST(small, descending)
 {
     heap_t heap;
-    EXPECT_EQ(0, 0);
+    for (std::int64_t i = 10; i >= 0; --i)
+        heap.add(i);
+
+    for (std::int64_t i = 0; i <= 10; ++i)
+        EXPECT_EQ(heap.remove_min(), i);
 }
 
 int main(int argc, char ** argv)
