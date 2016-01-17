@@ -5,7 +5,7 @@
 TEST(empty, size)
 {
     heap_t heap;
-    EXPECT_EQ(heap.size(), 0);
+    EXPECT_EQ(0, 0);
 }
 
 int main(int argc, char ** argv)
