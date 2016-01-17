@@ -1,5 +1,7 @@
 #include "buffer_tree.h"
 
+#include <boost/variant.hpp>
+
 namespace
 {
 struct node_add_visitor_t : boost::static_visitor<void>
@@ -31,31 +33,6 @@ void buffer_tree_t::add(std::int64_t x)
 {
     storage_t::any_node_t node = storage.load_node(storage.root_node());
     boost::apply_visitor(node_add_visitor_t(storage, x), node);
-}
-
-storage_t::any_node_t storage_t::load_node(const storage_t::node_id & id) const
-{
-
-}
-
-void storage_t::delete_node(const storage_t::node_id & id) const
-{
-
-}
-
-storage_t::node_id storage_t::root_node() const
-{
-    return root;
-}
-
-void storage_t::write_node(const storage_t::node_t & id) const
-{
-
-}
-
-void storage_t::write_node(const storage_t::leaf_t & id) const
-{
-
 }
 
 namespace
@@ -109,11 +86,4 @@ storage_t::leaf_t buffer_tree_t::pop_left()
     storage_t::any_node_t node = storage.load_node(storage.root_node());
 
     return boost::apply_visitor(node_visitor_t(storage), node).leaf;
-}
-
-
-
-void storage_t::node_t::flush() const
-{
-
 }

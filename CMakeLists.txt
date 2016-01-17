@@ -8,6 +8,7 @@ find_package(Boost COMPONENTS filesystem system REQUIRED)
 set(HEAP
     external_heap.h external_heap.cpp
     buffer_tree.h   buffer_tree.cpp
+    storage.h       storage.cpp
 )
 
 add_library(external_heap SHARED ${HEAP})
