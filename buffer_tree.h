@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <deque>
 #include <queue>
+#include <set>
 
 #include <boost/variant.hpp>
 #include <boost/filesystem.hpp>
@@ -16,6 +17,8 @@ struct storage_t
     any_node_t load_node(const node_id & id) const;
     void delete_node(const node_id & id) const;
     node_id root_node() const;
+    void write_node(const node_t & id) const;
+    void write_node(const leaf_t & id) const;
 
     struct node_t
     {
@@ -29,7 +32,7 @@ struct storage_t
     struct leaf_t
     {
         node_id id;
-        std::vector<std::int64_t> elements;
+        std::set<std::int64_t> elements;
     };
 
 private:

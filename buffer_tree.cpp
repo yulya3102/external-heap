@@ -9,16 +9,16 @@ struct node_add_visitor_t : boost::static_visitor<void>
         , x(x)
     {}
 
-    void operator () (const storage_t::leaf_t & leaf) const
+    void operator () (storage_t::leaf_t & leaf) const
     {
-        // TODO: add x to elements
-        // TODO: update node on filesystem
+        leaf.elements.insert(x);
+        storage.write_node(leaf);
     }
 
     void operator () (storage_t::node_t & node) const
     {
         node.pending_add.push(x);
-        // TODO: update node on filesystem
+        storage.write_node(node);
     }
 
 private:
@@ -48,6 +48,16 @@ storage_t::node_id storage_t::root_node() const
     return root;
 }
 
+void storage_t::write_node(const storage_t::node_t & id) const
+{
+
+}
+
+void storage_t::write_node(const storage_t::leaf_t & id) const
+{
+
+}
+
 namespace
 {
 struct visitor_result_t
@@ -62,39 +72,36 @@ struct node_visitor_t : boost::static_visitor<visitor_result_t>
         : storage(storage)
     {}
 
-    visitor_result_t operator () (const storage_t::leaf_t & leaf) const;
-    visitor_result_t operator () (storage_t::node_t & node) const;
+    visitor_result_t operator () (const storage_t::leaf_t & leaf) const
+    {
+        storage.delete_node(leaf.id);
+        return { leaf, true };
+    }
+
+    visitor_result_t operator () (storage_t::node_t & node) const
+    {
+        node.flush();
+
+        storage_t::any_node_t first_child = storage.load_node(node.children.front());
+        visitor_result_t res = boost::apply_visitor(node_visitor_t(storage), first_child);
+        if (res.was_removed)
+            node.children.pop_front();
+
+        bool was_removed = false;
+        if (node.children.empty())
+        {
+            storage.delete_node(node.id);
+            was_removed = true;
+        }
+        else
+            storage.write_node(node);
+
+        return { res.leaf, was_removed };
+    }
 
 private:
     const storage_t & storage;
 };
-
-visitor_result_t node_visitor_t::operator () (const storage_t::leaf_t & leaf) const
-{
-    storage.delete_node(leaf.id);
-    return { leaf, true };
-}
-
-visitor_result_t node_visitor_t::operator () (storage_t::node_t & node) const
-{
-    node.flush();
-
-    storage_t::any_node_t first_child = storage.load_node(node.children.front());
-    visitor_result_t res = boost::apply_visitor(node_visitor_t(storage), first_child);
-    if (res.was_removed)
-        node.children.pop_front();
-
-    bool was_removed = false;
-    if (node.children.empty())
-    {
-        storage.delete_node(node.id);
-        was_removed = true;
-    }
-
-    // TODO: update node on filesystem
-
-    return { res.leaf, was_removed };
-}
 }
 
 storage_t::leaf_t buffer_tree_t::pop_left()
