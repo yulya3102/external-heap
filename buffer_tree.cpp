@@ -1,7 +1,6 @@
 #include "buffer_tree.h"
 
 buffer_tree_t::buffer_tree_t()
-    : root("root")
 { }
 
 void buffer_tree_t::add(std::int64_t x)
@@ -9,19 +8,24 @@ void buffer_tree_t::add(std::int64_t x)
     // TODO
 }
 
-buffer_tree_t::any_node_t buffer_tree_t::load_node(const buffer_tree_t::node_id & id) const
+storage_t::any_node_t storage_t::load_node(const storage_t::node_id & id)
 {
 
 }
 
-buffer_tree_t::leaf_t buffer_tree_t::node_visitor_t::operator () (const leaf_t & leaf) const
+storage_t::node_id storage_t::root_node() const
+{
+    return root;
+}
+
+storage_t::leaf_t buffer_tree_t::node_visitor_t::operator () (const storage_t::leaf_t & leaf) const
 {
     // for leaf:
     // remove leaf from filesystem
     // return leaf
 }
 
-buffer_tree_t::leaf_t buffer_tree_t::node_visitor_t::operator () (const node_t & node) const
+storage_t::leaf_t buffer_tree_t::node_visitor_t::operator () (const storage_t::node_t & node) const
 {
     // for node:
     // flush
@@ -31,10 +35,10 @@ buffer_tree_t::leaf_t buffer_tree_t::node_visitor_t::operator () (const node_t &
     // return received leaf
 }
 
-buffer_tree_t::leaf_t buffer_tree_t::pop_left(const buffer_tree_t::node_id & id)
+storage_t::leaf_t buffer_tree_t::pop_left()
 {
-    any_node_t node = load_node(id);
+    storage_t::any_node_t node = storage.load_node(storage.root_node());
 
-    boost::apply_visitor(node_visitor_t(), node);
+    return boost::apply_visitor(node_visitor_t(), node);
 }
 
