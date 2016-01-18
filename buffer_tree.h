@@ -15,6 +15,11 @@ struct node_t
 {
     Id id;
     std::deque<Id> children;
+
+    void add(std::int64_t x)
+    {
+        // TODO
+    }
 };
 
 template <typename Id>
@@ -22,9 +27,19 @@ struct buffer_node_t : node_t<Id>
 {
     std::queue<std::int64_t> pending_add;
 
-    void flush() const
+    void add(std::int64_t x)
     {
+        pending_add.push(x);
+    }
 
+    void flush()
+    {
+        while (!pending_add.empty())
+        {
+            auto x = pending_add.front();
+            node_t<Id>::add(x);
+            pending_add.pop();
+        }
     }
 };
 
