@@ -10,6 +10,31 @@
 
 #include "storage.h"
 
+template <typename Id>
+struct node_t
+{
+    Id id;
+    std::deque<Id> children;
+};
+
+template <typename Id>
+struct buffer_node_t : node_t<Id>
+{
+    std::queue<std::int64_t> pending_add;
+
+    void flush() const
+    {
+
+    }
+};
+
+template <typename Id>
+struct leaf_t
+{
+    Id id;
+    std::set<std::int64_t> elements;
+};
+
 struct buffer_tree_t
 {
     void add(std::int64_t x);
