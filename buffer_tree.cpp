@@ -4,6 +4,7 @@
 
 namespace
 {
+/*
 struct node_add_visitor_t : boost::static_visitor<void>
 {
     node_add_visitor_t(buffer_tree_t::buffer_storage_t & storage, std::int64_t x)
@@ -27,17 +28,18 @@ private:
     buffer_tree_t::buffer_storage_t & storage;
     std::int64_t x;
 };
+*/
 }
 
 void buffer_tree_t::add(std::int64_t x)
 {
     storage_node_t node = storage.load_node(root_);
-    node_add_visitor_t visitor(storage, x);
-    boost::apply_visitor(visitor, node);
+    // TODO: add x to node
 }
 
 namespace
 {
+/*
 struct visitor_result_t
 {
     leaf_t<buffer_tree_t::node_id, std::int64_t> leaf;
@@ -81,12 +83,12 @@ struct node_visitor_t : boost::static_visitor<visitor_result_t>
 private:
     buffer_tree_t::buffer_storage_t & storage;
 };
+*/
 }
 
 leaf_t<buffer_tree_t::node_id, std::int64_t> buffer_tree_t::pop_left()
 {
     buffer_tree_t::storage_node_t node = storage.load_node(root_);
 
-    node_visitor_t visitor(storage);
-    return boost::apply_visitor(visitor, node).leaf;
+    // TODO: pop left leaf from node
 }

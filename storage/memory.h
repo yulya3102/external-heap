@@ -5,6 +5,9 @@
 namespace storage
 {
 template <typename Node>
+struct node_traits {};
+
+template <typename Node>
 struct memory
 {
     using node_id = int;
@@ -16,7 +19,8 @@ struct memory
 
     Node load_node(const node_id & id) const
     {
-        return storage_.at(id);
+        Node result = node_traits<Node>::deserialize(storage_.at(id));
+        return std::move(result);
     }
 
     void delete_node(const node_id & id)
@@ -26,10 +30,10 @@ struct memory
 
     void write_node(const node_id & id, const Node & node)
     {
-        storage_[id] = node;
+        storage_[id] = node_traits<Node>::serialize(node);
     }
 
 private:
-    std::unordered_map<node_id, Node> storage_;
+    std::unordered_map<node_id, typename node_traits<Node>::serialized_t> storage_;
 };
 }

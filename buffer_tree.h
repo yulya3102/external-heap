@@ -77,6 +77,25 @@ private:
     std::set<T> elements;
 };
 
+namespace storage
+{
+template <>
+struct node_traits<std::unique_ptr<any_node_t<int> > >
+{
+    using serialized_t = std::unique_ptr<any_node_t<int> >;
+
+    static serialized_t serialize(const std::unique_ptr<any_node_t<int> > & node)
+    {
+
+    }
+
+    static std::unique_ptr<any_node_t<int> > deserialize(const serialized_t & serialized)
+    {
+
+    }
+};
+}
+
 struct buffer_tree_t
 {
     void add(std::int64_t x);
@@ -90,7 +109,7 @@ struct buffer_tree_t
     }
 
     using node_id = int;
-    using storage_node_t = boost::variant<buffer_node_t<node_id, std::int64_t>, leaf_t<node_id, std::int64_t> >;
+    using storage_node_t = std::unique_ptr<any_node_t<int> >;
     using buffer_storage_t = storage::memory<storage_node_t>;
 
 private:
