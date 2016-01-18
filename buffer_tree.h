@@ -36,8 +36,6 @@ struct node_t : any_node_t<Id>
 template <typename Id, typename T>
 struct buffer_node_t : node_t<Id, T>
 {
-    std::queue<T> pending_add;
-
     void add(const T & x)
     {
         pending_add.push(x);
@@ -52,11 +50,30 @@ struct buffer_node_t : node_t<Id, T>
             pending_add.pop();
         }
     }
+
+private:
+    std::queue<T> pending_add;
 };
 
 template <typename Id, typename T>
 struct leaf_t : any_node_t<Id>
 {
+    template <typename OutIter>
+    OutIter & write_elements(OutIter & out)
+    {
+        for (const T & elem : elements)
+        {
+            *out = elem;
+            ++out;
+        }
+    }
+
+    void add(const T & x)
+    {
+        elements.insert(x);
+    }
+
+private:
     std::set<T> elements;
 };
 
@@ -82,10 +99,6 @@ template <typename OutIter>
 OutIter buffer_tree_t::fetch_block(OutIter out)
 {
     leaf_t<node_id, std::int64_t> leaf = pop_left();
-    for (std::int64_t elem : leaf.elements)
-    {
-        *out = elem;
-        ++out;
-    }
+    leaf.write_elements(out);
     return out;
 }

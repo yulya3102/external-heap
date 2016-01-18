@@ -13,13 +13,13 @@ struct node_add_visitor_t : boost::static_visitor<void>
 
     void operator () (leaf_t<buffer_tree_t::node_id, std::int64_t> & leaf)
     {
-        leaf.elements.insert(x);
+        leaf.add(x);
         storage.write_node(leaf.id(), leaf);
     }
 
     void operator () (buffer_node_t<buffer_tree_t::node_id, std::int64_t> & node)
     {
-        node.pending_add.push(x);
+        node.add(x);
         storage.write_node(node.id(), node);
     }
 
