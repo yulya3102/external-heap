@@ -17,16 +17,20 @@ struct buffer_tree_t
     template <typename OutIter>
     OutIter fetch_block(OutIter out);
 
-private:
-    leaf_t<storage_t::node_id> pop_left();
+    using node_id = boost::filesystem::path;
+    using storage_node_t = boost::variant<buffer_node_t<node_id>, leaf_t<node_id> >;
+    using buffer_storage_t = storage_t<storage_node_t>;
 
-    storage_t storage;
+private:
+    leaf_t<node_id> pop_left();
+
+    buffer_storage_t storage;
 };
 
 template <typename OutIter>
 OutIter buffer_tree_t::fetch_block(OutIter out)
 {
-    leaf_t<storage_t::node_id> leaf = pop_left();
+    leaf_t<node_id> leaf = pop_left();
     for (std::int64_t elem : leaf.elements)
     {
         *out = elem;

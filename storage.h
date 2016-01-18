@@ -32,16 +32,30 @@ struct leaf_t
     std::set<std::int64_t> elements;
 };
 
+template <typename Node>
 struct storage_t
 {
     using node_id = boost::filesystem::path;
-    using any_node_t = boost::variant<buffer_node_t<node_id>, leaf_t<node_id> >;
 
-    any_node_t load_node(const node_id & id) const;
-    void delete_node(const node_id & id) const;
-    node_id root_node() const;
-    void write_node(const buffer_node_t<node_id> & id) const;
-    void write_node(const leaf_t<node_id> & id) const;
+    Node load_node(const node_id & id) const
+    {
+
+    }
+
+    void delete_node(const node_id & id) const
+    {
+
+    }
+
+    node_id root_node() const
+    {
+
+    }
+
+    void write_node(const node_id & id, const Node & node) const
+    {
+
+    }
 
 private:
     node_id root;
