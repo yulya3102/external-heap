@@ -82,7 +82,12 @@ struct buffer_tree_t
     void add(std::int64_t x);
 
     template <typename OutIter>
-    OutIter fetch_block(OutIter out);
+    OutIter fetch_block(OutIter out)
+    {
+        leaf_t<node_id, std::int64_t> leaf = pop_left();
+        leaf.write_elements(out);
+        return out;
+    }
 
     using node_id = int;
     using storage_node_t = boost::variant<buffer_node_t<node_id, std::int64_t>, leaf_t<node_id, std::int64_t> >;
@@ -94,11 +99,3 @@ private:
     node_id root_;
     buffer_storage_t storage;
 };
-
-template <typename OutIter>
-OutIter buffer_tree_t::fetch_block(OutIter out)
-{
-    leaf_t<node_id, std::int64_t> leaf = pop_left();
-    leaf.write_elements(out);
-    return out;
-}
