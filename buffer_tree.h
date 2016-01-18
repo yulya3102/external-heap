@@ -28,11 +28,11 @@ struct buffer_node_t : node_t<Id>
     }
 };
 
-template <typename Id>
+template <typename Id, typename T>
 struct leaf_t
 {
     Id id;
-    std::set<std::int64_t> elements;
+    std::set<T> elements;
 };
 
 struct buffer_tree_t
@@ -43,11 +43,11 @@ struct buffer_tree_t
     OutIter fetch_block(OutIter out);
 
     using node_id = boost::filesystem::path;
-    using storage_node_t = boost::variant<buffer_node_t<node_id>, leaf_t<node_id> >;
+    using storage_node_t = boost::variant<buffer_node_t<node_id>, leaf_t<node_id, std::int64_t> >;
     using buffer_storage_t = storage_t<storage_node_t>;
 
 private:
-    leaf_t<node_id> pop_left();
+    leaf_t<node_id, std::int64_t> pop_left();
 
     buffer_storage_t storage;
 };
@@ -55,7 +55,7 @@ private:
 template <typename OutIter>
 OutIter buffer_tree_t::fetch_block(OutIter out)
 {
-    leaf_t<node_id> leaf = pop_left();
+    leaf_t<node_id, std::int64_t> leaf = pop_left();
     for (std::int64_t elem : leaf.elements)
     {
         *out = elem;
