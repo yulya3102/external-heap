@@ -17,7 +17,7 @@ struct node_add_visitor_t : boost::static_visitor<void>
         storage.write_node(leaf.id, leaf);
     }
 
-    void operator () (buffer_node_t<buffer_tree_t::node_id> & node) const
+    void operator () (buffer_node_t<buffer_tree_t::node_id, std::int64_t> & node) const
     {
         node.pending_add.push(x);
         storage.write_node(node.id, node);
@@ -55,7 +55,7 @@ struct node_visitor_t : boost::static_visitor<visitor_result_t>
         return { leaf, true };
     }
 
-    visitor_result_t operator () (buffer_node_t<buffer_tree_t::node_id> & node) const
+    visitor_result_t operator () (buffer_node_t<buffer_tree_t::node_id, std::int64_t> & node) const
     {
         node.flush();
 

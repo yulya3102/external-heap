@@ -10,24 +10,24 @@
 
 #include "storage.h"
 
-template <typename Id>
+template <typename Id, typename T>
 struct node_t
 {
     Id id;
     std::deque<Id> children;
 
-    void add(std::int64_t x)
+    void add(const T & x)
     {
         // TODO
     }
 };
 
-template <typename Id>
-struct buffer_node_t : node_t<Id>
+template <typename Id, typename T>
+struct buffer_node_t : node_t<Id, T>
 {
-    std::queue<std::int64_t> pending_add;
+    std::queue<T> pending_add;
 
-    void add(std::int64_t x)
+    void add(const T & x)
     {
         pending_add.push(x);
     }
@@ -37,7 +37,7 @@ struct buffer_node_t : node_t<Id>
         while (!pending_add.empty())
         {
             auto x = pending_add.front();
-            node_t<Id>::add(x);
+            node_t<Id, T>::add(x);
             pending_add.pop();
         }
     }
@@ -58,7 +58,7 @@ struct buffer_tree_t
     OutIter fetch_block(OutIter out);
 
     using node_id = boost::filesystem::path;
-    using storage_node_t = boost::variant<buffer_node_t<node_id>, leaf_t<node_id, std::int64_t> >;
+    using storage_node_t = boost::variant<buffer_node_t<node_id, std::int64_t>, leaf_t<node_id, std::int64_t> >;
     using buffer_storage_t = storage_t<storage_node_t>;
 
 private:
