@@ -18,7 +18,7 @@ struct buffer_tree_t
     OutIter fetch_block(OutIter out);
 
 private:
-    leaf_t<storage_t> pop_left();
+    leaf_t<storage_t::node_id> pop_left();
 
     storage_t storage;
 };
@@ -26,7 +26,7 @@ private:
 template <typename OutIter>
 OutIter buffer_tree_t::fetch_block(OutIter out)
 {
-    leaf_t<storage_t> leaf = pop_left();
+    leaf_t<storage_t::node_id> leaf = pop_left();
     for (std::int64_t elem : leaf.elements)
     {
         *out = elem;
