@@ -57,9 +57,9 @@ struct buffer_tree_t
     template <typename OutIter>
     OutIter fetch_block(OutIter out);
 
-    using node_id = boost::filesystem::path;
+    using node_id = int;
     using storage_node_t = boost::variant<buffer_node_t<node_id, std::int64_t>, leaf_t<node_id, std::int64_t> >;
-    using buffer_storage_t = storage_t<storage_node_t>;
+    using buffer_storage_t = storage::memory<storage_node_t>;
 
 private:
     leaf_t<node_id, std::int64_t> pop_left();

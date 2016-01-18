@@ -1,11 +1,11 @@
 #pragma once
 
-#include <boost/filesystem.hpp>
-
-template <typename Node>
-struct storage_t
+namespace storage
 {
-    using node_id = boost::filesystem::path;
+template <typename Node>
+struct memory
+{
+    using node_id = int;
 
     Node load_node(const node_id & id) const
     {
@@ -30,3 +30,4 @@ struct storage_t
 private:
     node_id root;
 };
+}
