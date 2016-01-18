@@ -16,19 +16,12 @@ storage_t::node_id storage_t::root_node() const
     return root;
 }
 
-void storage_t::write_node(const storage_t::node_t & id) const
+void storage_t::write_node(const node_t<storage_t> & id) const
 {
 
 }
 
-void storage_t::write_node(const storage_t::leaf_t & id) const
-{
-
-}
-
-
-
-void storage_t::node_t::flush() const
+void storage_t::write_node(const leaf_t<storage_t> & id) const
 {
 
 }
