@@ -16,7 +16,7 @@ storage_t::node_id storage_t::root_node() const
     return root;
 }
 
-void storage_t::write_node(const node_t<storage_t> & id) const
+void storage_t::write_node(const buffer_node_t<storage_t> & id) const
 {
 
 }
