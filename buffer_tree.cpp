@@ -31,7 +31,7 @@ private:
 
 void buffer_tree_t::add(std::int64_t x)
 {
-    storage_node_t node = storage.load_node(storage.root_node());
+    storage_node_t node = storage.load_node(root_);
     boost::apply_visitor(node_add_visitor_t(storage, x), node);
 }
 
@@ -83,7 +83,7 @@ private:
 
 leaf_t<buffer_tree_t::node_id, std::int64_t> buffer_tree_t::pop_left()
 {
-    buffer_tree_t::storage_node_t node = storage.load_node(storage.root_node());
+    buffer_tree_t::storage_node_t node = storage.load_node(root_);
 
     return boost::apply_visitor(node_visitor_t(storage), node).leaf;
 }

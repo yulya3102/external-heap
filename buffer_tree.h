@@ -64,6 +64,7 @@ struct buffer_tree_t
 private:
     leaf_t<node_id, std::int64_t> pop_left();
 
+    node_id root_;
     buffer_storage_t storage;
 };
 
