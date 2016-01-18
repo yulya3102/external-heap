@@ -10,10 +10,21 @@
 
 #include "storage/memory.h"
 
-template <typename Id, typename T>
-struct node_t
+template <typename Id>
+struct any_node_t
 {
-    Id id;
+    Id id() const
+    {
+        return id_;
+    }
+
+private:
+    Id id_;
+};
+
+template <typename Id, typename T>
+struct node_t : any_node_t<Id>
+{
     std::deque<Id> children;
 
     void add(const T & x)
@@ -44,9 +55,8 @@ struct buffer_node_t : node_t<Id, T>
 };
 
 template <typename Id, typename T>
-struct leaf_t
+struct leaf_t : any_node_t<Id>
 {
-    Id id;
     std::set<T> elements;
 };
 

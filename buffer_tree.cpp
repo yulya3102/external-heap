@@ -14,13 +14,13 @@ struct node_add_visitor_t : boost::static_visitor<void>
     void operator () (leaf_t<buffer_tree_t::node_id, std::int64_t> & leaf)
     {
         leaf.elements.insert(x);
-        storage.write_node(leaf.id, leaf);
+        storage.write_node(leaf.id(), leaf);
     }
 
     void operator () (buffer_node_t<buffer_tree_t::node_id, std::int64_t> & node)
     {
         node.pending_add.push(x);
-        storage.write_node(node.id, node);
+        storage.write_node(node.id(), node);
     }
 
 private:
@@ -52,7 +52,7 @@ struct node_visitor_t : boost::static_visitor<visitor_result_t>
 
     visitor_result_t operator () (const leaf_t<buffer_tree_t::node_id, std::int64_t> & leaf)
     {
-        storage.delete_node(leaf.id);
+        storage.delete_node(leaf.id());
         return { leaf, true };
     }
 
@@ -69,11 +69,11 @@ struct node_visitor_t : boost::static_visitor<visitor_result_t>
         bool was_removed = false;
         if (node.children.empty())
         {
-            storage.delete_node(node.id);
+            storage.delete_node(node.id());
             was_removed = true;
         }
         else
-            storage.write_node(node.id, node);
+            storage.write_node(node.id(), node);
 
         return { res.leaf, was_removed };
     }
