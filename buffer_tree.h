@@ -8,7 +8,7 @@
 #include <boost/variant.hpp>
 #include <boost/filesystem.hpp>
 
-#include "storage.h"
+#include "storage/memory.h"
 
 template <typename Id, typename T>
 struct node_t
