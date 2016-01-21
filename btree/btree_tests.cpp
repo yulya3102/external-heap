@@ -4,7 +4,7 @@
 
 TEST(btree, init)
 {
-    bptree::b_internal_node<int, int, 2> node;
+    bptree::b_tree<int, int, 2> tree;
 }
 
 int main(int argc, char ** argv)
