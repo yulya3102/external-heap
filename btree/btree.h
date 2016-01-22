@@ -10,6 +10,10 @@ namespace bptree
 template <typename Key, typename Value, int t>
 struct b_tree
 {
+    b_tree()
+        : root_(new b_leaf())
+    { }
+
     void add(Key && key, Value && value)
     {
         b_node_ptr node = root_;
