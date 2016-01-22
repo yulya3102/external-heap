@@ -81,12 +81,14 @@ private:
     b_node_ptr split_full(b_node_ptr x)
     {
         assert(x->size() == 2 * t - 1);
-        assert(x->parent_->size() < 2 * t - 1);
+        assert(!x->parent_ || x->parent_->size() < 2 * t - 1);
 
-        // Split node: replace x with new internal node s,
+        // Split node: replace x with its parent s (or new internal node)
         // make new node y of the same type as x
         // and make x and y children of the new node
-        b_internal * s = new b_internal();
+        b_internal * s = x->parent_ ?
+                    dynamic_cast<b_internal *>(x->parent_) :
+                    new b_internal();
         b_node_ptr y;
 
         if (is_leaf(x))
@@ -98,7 +100,14 @@ private:
             for (size_t i = 0; i < t - 1; ++i)
                 ++split_by_it;
 
-            s->keys_.push_back(split_by_it->first);
+            {
+                // Insert new key after one pointing to x
+                auto x_it = std::find(s->children_.begin(), s->children_.end(), x);
+                size_t x_i = x_it - s->children_.begin();
+                auto x_key_it = s->keys_.begin() + x_i;
+                s->keys_.insert(x_key_it, split_by_it->first);
+            }
+
             for (auto it = split_by_it; it != x_leaf->values_.end(); ++it)
                 y_leaf->values_[it->first] = std::move(it->second);
             x_leaf->values_.erase(split_by_it, x_leaf->values_.end());
@@ -130,17 +139,30 @@ private:
             y = y_int;
         }
 
-        // Update link from x->parent_ to s
-        if (!x->parent_) // parent link is null, x is the root node
-            root_ = s;
-        else             // find child pointing to x and replace it
+        // Replace link from s to x with two links: to x and y
+        // or just add two new links if s is empty
         {
-            b_internal * parent = dynamic_cast<b_internal *>(x->parent_);
-            *std::find(parent->children_.begin(), parent->children_.end(), x) = s;
+            auto it = std::find(s->children_.begin(), s->children_.end(), x);
+            // *it == x || it == end
+            if (it != s->children_.end())
+                it = s->children_.erase(it);
+            // *it == element after x
+            // insert before it
+            it = s->children_.insert(it, y);
+            // *it == y
+            // insert before it
+            it = s->children_.insert(it, x);
+            // *it == x
+        }
+
+        // Update root link if necessary
+        if (!x->parent_)
+        {
+            root_ = s;
+            s->parent_ = nullptr;
         }
 
         // Update s, x and y parent links
-        s->parent_ = x->parent_;
         x->parent_ = s;
         y->parent_ = s;
 
