@@ -5,6 +5,7 @@
 TEST(btree, init)
 {
     bptree::b_tree<int, int, 2> tree;
+    tree.add(1, 2);
 }
 
 int main(int argc, char ** argv)
