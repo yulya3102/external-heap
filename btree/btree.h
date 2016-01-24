@@ -38,14 +38,7 @@ struct b_tree
     }
 
 private:
-    struct b_node
-    {
-        using b_node_ptr = b_node *;
-
-        virtual std::size_t size() const = 0;
-
-        b_node_ptr parent_;
-    };
+    struct b_node;
 
     using b_node_ptr = typename b_node::b_node_ptr;
 
@@ -70,6 +63,15 @@ private:
         }
     };
 
+    struct b_node
+    {
+        using b_node_ptr = b_node *;
+
+        virtual std::size_t size() const = 0;
+
+        b_internal * parent_;
+    };
+
     b_node_ptr root_;
 
     bool is_leaf(b_node_ptr x)
@@ -86,9 +88,7 @@ private:
         // Split node: replace x with its parent s (or new internal node)
         // make new node y of the same type as x
         // and make x and y children of the new node
-        b_internal * s = x->parent_ ?
-                    dynamic_cast<b_internal *>(x->parent_) :
-                    new b_internal();
+        b_internal * s = x->parent_ ? x->parent_ : new b_internal();
         b_node_ptr y;
 
         if (is_leaf(x))
