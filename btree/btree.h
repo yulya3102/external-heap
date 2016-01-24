@@ -206,13 +206,23 @@ private:
 
         if (parent)
         {
-            assert(parent->keys_.size() >= t || (parent->parent_ == nullptr && parent->keys_.size() >= 2));
+            assert(parent->keys_.size() >= t || parent->parent_ == nullptr);
 
             // Remove link to leaf from parent
             auto it = std::find(parent->children_.begin(), parent->children_.end(), leaf);
             std::size_t i = it - parent->children_.begin();
             parent->keys_.erase(parent->keys_.begin() + i);
             parent->children_.erase(parent->children_.begin() + i);
+
+            // If parent became empty (that could only happen if it was root), make new root
+            if (parent->size() == 0)
+            {
+                assert(parent->parent_ == nullptr);
+
+                root_ = parent->children_.front();
+                delete root_->parent_;
+                root_->parent_ = nullptr;
+            }
         }
         else
             root_ = nullptr;
@@ -279,14 +289,16 @@ private:
         {
             if (node->keys_.size() == t - 1)
             {
+                b_internal * parent = node->parent_;
+
                 // Find parent link to it
-                auto it = std::find(node->children_.begin(), node->children_.end(), node);
-                std::size_t i = it - node->children_.begin();
+                auto it = std::find(parent->children_.begin(), parent->children_.end(), node);
+                std::size_t i = it - parent->children_.begin();
 
                 // Check brothers
-                if (i + 1 < node->parent_->size())
+                if (i + 1 <= parent->size())
                 {
-                    b_internal * right_brother = dynamic_cast<b_internal *>(node->children_[i + 1]);
+                    b_internal * right_brother = dynamic_cast<b_internal *>(parent->children_[i + 1]);
 
                     if (right_brother->keys_.size() >= t)
                     {
@@ -296,8 +308,8 @@ private:
                         node->children_.back()->parent_ = node;
 
                         // Update keys
-                        node->keys_.push_back(std::move(node->parent_->keys_[i]));
-                        node->parent_->keys_[i] = right_brother->keys_.front();
+                        node->keys_.push_back(std::move(parent->keys_[i]));
+                        parent->keys_[i] = right_brother->keys_.front();
                         right_brother->keys_.erase(right_brother->keys_.begin());
                     }
                     else
@@ -305,7 +317,7 @@ private:
                 }
                 else
                 {
-                    b_internal * left_brother = dynamic_cast<b_internal *>(node->children_[i - 1]);
+                    b_internal * left_brother = dynamic_cast<b_internal *>(parent->children_[i - 1]);
 
                     if (left_brother->keys_.size() >= t)
                     {
@@ -315,8 +327,8 @@ private:
                         node->children_.front()->parent_ = node;
 
                         // Update keys
-                        node->keys_.insert(node->keys_.begin(), std::move(node->parent_->keys_[i - 1]));
-                        node->parent_->keys_[i - 1] = left_brother->keys_.back();
+                        node->keys_.insert(node->keys_.begin(), std::move(parent->keys_[i - 1]));
+                        parent->keys_[i - 1] = left_brother->keys_.back();
                         left_brother->keys_.pop_back();
                     }
                     else
