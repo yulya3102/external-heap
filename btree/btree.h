@@ -45,14 +45,20 @@ struct b_tree
         while (!is_leaf(node))
         {
             b_internal * node_int = dynamic_cast<b_internal *>(node);
+            if (node_int->parent_ != nullptr)
+                node_int = ensure_enough_keys(node_int);
+
             node = node_int->children_.front();
         }
-
-        // TODO: ensure node->parent_ has more than minimal amount of keys
 
         b_leaf * leaf = dynamic_cast<b_leaf *>(node);
 
         return remove_leaf(leaf, out);
+    }
+
+    bool empty() const
+    {
+        return root_ == nullptr || root_->size() == 0;
     }
 
 private:
@@ -68,6 +74,8 @@ private:
         {
             return values_.size();
         }
+
+        virtual ~b_leaf() = default;
     };
 
     struct b_internal : b_node
@@ -79,6 +87,8 @@ private:
         {
             return keys_.size();
         }
+
+        virtual ~b_internal() = default;
     };
 
     struct b_node
@@ -88,6 +98,8 @@ private:
         virtual std::size_t size() const = 0;
 
         b_internal * parent_;
+
+        virtual ~b_node() = default;
     };
 
     b_node_ptr root_;
@@ -194,7 +206,7 @@ private:
 
         if (parent)
         {
-            assert(parent->keys_ >= t || (parent->parent_ == nullptr && parent->keys_ >= 2));
+            assert(parent->keys_.size() >= t || (parent->parent_ == nullptr && parent->keys_.size() >= 2));
 
             // Remove link to leaf from parent
             auto it = std::find(parent->children_.begin(), parent->children_.end(), leaf);
@@ -216,6 +228,104 @@ private:
         delete leaf;
 
         return out;
+    }
+
+    b_internal * merge_brothers(b_internal * left_brother, std::size_t i, b_internal * right_brother)
+    {
+        assert(left_brother->parent_ == right_brother->parent_);
+        assert(left_brother->parent_->children_[i] == left_brother);
+        assert(left_brother->parent_->parent_ == nullptr || left_brother->parent_->size() > t - 1);
+
+        // Move children from right brother to the node
+        for (auto child_it = right_brother->children_.begin();
+             child_it != right_brother->children_.end();
+             ++child_it)
+        {
+            (*child_it)->parent_ = left_brother;
+            left_brother->children_.push_back(std::move(*child_it));
+        }
+
+        // Move key from parent to the node
+        left_brother->keys_.push_back(std::move(left_brother->parent_->keys_[i]));
+        left_brother->parent_->keys_.erase(left_brother->parent_->keys_.begin() + i);
+
+        // Move keys from right brother to the node
+        for (auto key_it = right_brother->keys_.begin();
+             key_it != right_brother->keys_.end();
+             ++key_it)
+            left_brother->keys_.push_back(std::move(*key_it));
+
+        // Remove link to right brother from parent
+        left_brother->parent_->children_.erase(left_brother->parent_->children_.begin() + i + 1);
+
+        // Delete right brother
+        delete right_brother;
+
+        // If parent became empty (could happen only if it is root and had only one key)
+        // then make the node new root
+        if (left_brother->parent_->size() == 0)
+        {
+            root_ = left_brother;
+            delete left_brother->parent_;
+            left_brother->parent_ = nullptr;
+        }
+
+        return left_brother;
+    }
+
+    b_internal * ensure_enough_keys(b_internal * node)
+    {
+        if (node->parent_ != nullptr)
+        {
+            if (node->keys_.size() == t - 1)
+            {
+                // Find parent link to it
+                auto it = std::find(node->children_.begin(), node->children_.end(), node);
+                std::size_t i = it - node->children_.begin();
+
+                // Check brothers
+                if (i + 1 < node->parent_->size())
+                {
+                    b_internal * right_brother = dynamic_cast<b_internal *>(node->children_[i + 1]);
+
+                    if (right_brother->keys_.size() >= t)
+                    {
+                        // Move left child from right brother to the node
+                        node->children_.push_back(std::move(right_brother->children_.front()));
+                        right_brother->children_.erase(right_brother->children_.begin());
+                        node->children_.back()->parent_ = node;
+
+                        // Update keys
+                        node->keys_.push_back(std::move(node->parent_->keys_[i]));
+                        node->parent_->keys_[i] = right_brother->keys_.front();
+                        right_brother->keys_.erase(right_brother->keys_.begin());
+                    }
+                    else
+                        node = merge_brothers(node, i, right_brother);
+                }
+                else
+                {
+                    b_internal * left_brother = dynamic_cast<b_internal *>(node->children_[i - 1]);
+
+                    if (left_brother->keys_.size() >= t)
+                    {
+                        // Move right child from left brother to the node
+                        node->children_.insert(node->children_.begin(), std::move(left_brother->children_.back()));
+                        left_brother->children_.pop_back();
+                        node->children_.front()->parent_ = node;
+
+                        // Update keys
+                        node->keys_.insert(node->keys_.begin(), std::move(node->parent_->keys_[i - 1]));
+                        node->parent_->keys_[i - 1] = left_brother->keys_.back();
+                        left_brother->keys_.pop_back();
+                    }
+                    else
+                        node = merge_brothers(left_brother, i - 1, node);
+                }
+
+            }
+        }
+        return node;
     }
 };
 }
