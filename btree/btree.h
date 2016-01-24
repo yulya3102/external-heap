@@ -37,6 +37,24 @@ struct b_tree
         leaf->values_[key] = value;
     }
 
+    template <typename OutIter>
+    OutIter remove_left_leaf(OutIter out)
+    {
+        b_node_ptr node = root_;
+
+        while (!is_leaf(node))
+        {
+            b_internal * node_int = dynamic_cast<b_internal *>(node);
+            node = node_int->children_.front();
+        }
+
+        // TODO: ensure node->parent_ has more than minimal amount of keys
+
+        b_leaf * leaf = dynamic_cast<b_leaf *>(node);
+
+        return remove_leaf(leaf, out);
+    }
+
 private:
     struct b_node;
 
