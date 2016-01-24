@@ -169,5 +169,35 @@ private:
         return s;
     }
 
+    template <typename OutIter>
+    OutIter remove_leaf(b_leaf * leaf, OutIter out)
+    {
+        b_internal * parent = leaf->parent_;
+
+        if (parent)
+        {
+            assert(parent->keys_ >= t || (parent->parent_ == nullptr && parent->keys_ >= 2));
+
+            // Remove link to leaf from parent
+            auto it = std::find(parent->children_.begin(), parent->children_.end(), leaf);
+            std::size_t i = it - parent->children_.begin();
+            parent->keys_.erase(parent->keys_.begin() + i);
+            parent->children_.erase(parent->children_.begin() + i);
+        }
+        else
+            root_ = nullptr;
+
+        // Copy all elements from leaf to given output iterator
+        for (auto x : leaf->values_)
+        {
+            *out = std::move(x);
+            ++out;
+        }
+
+        // Delete leaf
+        delete leaf;
+
+        return out;
+    }
 };
 }
