@@ -5,25 +5,68 @@
 #include <cassert>
 #include <algorithm>
 
+namespace detail
+{
+struct b_node
+{
+    using b_node_ptr = b_node *;
+
+    virtual std::size_t size() const = 0;
+
+    b_node * parent_;
+
+    virtual ~b_node() = default;
+};
+
+using b_node_ptr = b_node::b_node_ptr;
+
+template <typename Key, typename Value>
+struct b_leaf : b_node
+{
+    std::vector<std::pair<Key, Value> > values_;
+
+    virtual std::size_t size() const
+    {
+        return values_.size();
+    }
+
+    virtual ~b_leaf() = default;
+};
+
+template<typename Key>
+struct b_internal : b_node
+{
+    std::vector<Key> keys_;
+    std::vector<b_node_ptr> children_;
+
+    virtual std::size_t size() const
+    {
+        return keys_.size();
+    }
+
+    virtual ~b_internal() = default;
+};
+}
+
 namespace bptree
 {
 template <typename Key, typename Value, int t>
 struct b_tree
 {
     b_tree()
-        : root_(new b_leaf())
+        : root_(new leaf_t())
     { }
 
     void add(Key && key, Value && value)
     {
-        b_node_ptr node = get_root();
+        detail::b_node_ptr node = get_root();
 
         if (node->size() == 2 * t - 1)
             node = split_full(node);
 
         while (!is_leaf(node))
         {
-            b_internal * int_node = dynamic_cast<b_internal *>(node);
+            internal_t * int_node = dynamic_cast<internal_t *>(node);
 
             auto it = std::lower_bound(int_node->keys_.begin(), int_node->keys_.end(), key);
             std::size_t i = it - int_node->keys_.begin();
@@ -33,7 +76,7 @@ struct b_tree
                 node = split_full(node);
         }
 
-        b_leaf * leaf = dynamic_cast<b_leaf *>(node);
+        leaf_t * leaf = dynamic_cast<leaf_t *>(node);
 
         auto v = std::make_pair(std::move(key), std::move(value));
         auto it = std::lower_bound(leaf->values_.begin(), leaf->values_.end(), v);
@@ -43,18 +86,18 @@ struct b_tree
     template <typename OutIter>
     OutIter remove_left_leaf(OutIter out)
     {
-        b_node_ptr node = get_root();
+        detail::b_node_ptr node = get_root();
 
         while (!is_leaf(node))
         {
-            b_internal * node_int = dynamic_cast<b_internal *>(node);
+            internal_t * node_int = dynamic_cast<internal_t *>(node);
             if (node_int->parent_ != nullptr)
                 node_int = ensure_enough_keys(node_int);
 
             node = node_int->children_.front();
         }
 
-        b_leaf * leaf = dynamic_cast<b_leaf *>(node);
+        leaf_t * leaf = dynamic_cast<leaf_t *>(node);
 
         return remove_leaf(leaf, out);
     }
@@ -65,55 +108,18 @@ struct b_tree
     }
 
 private:
-    struct b_node;
+    detail::b_node_ptr root_;
 
-    using b_node_ptr = typename b_node::b_node_ptr;
+    using leaf_t = detail::b_leaf<Key, Value>;
+    using internal_t = detail::b_internal<Key>;
 
-    struct b_leaf : b_node
+    bool is_leaf(detail::b_node_ptr x)
     {
-        std::vector<std::pair<Key, Value> > values_;
-
-        virtual std::size_t size() const
-        {
-            return values_.size();
-        }
-
-        virtual ~b_leaf() = default;
-    };
-
-    struct b_internal : b_node
-    {
-        std::vector<Key> keys_;
-        std::vector<b_node_ptr> children_;
-
-        virtual std::size_t size() const
-        {
-            return keys_.size();
-        }
-
-        virtual ~b_internal() = default;
-    };
-
-    struct b_node
-    {
-        using b_node_ptr = b_node *;
-
-        virtual std::size_t size() const = 0;
-
-        b_internal * parent_;
-
-        virtual ~b_node() = default;
-    };
-
-    b_node_ptr root_;
-
-    bool is_leaf(b_node_ptr x)
-    {
-        b_leaf * leaf = dynamic_cast<b_leaf *>(x);
+        leaf_t * leaf = dynamic_cast<leaf_t *>(x);
         return leaf != nullptr;
     }
 
-    b_node_ptr split_full(b_node_ptr x)
+    detail::b_node_ptr split_full(detail::b_node_ptr x)
     {
         assert(x->size() == 2 * t - 1);
         assert(!x->parent_ || x->parent_->size() < 2 * t - 1);
@@ -121,13 +127,13 @@ private:
         // Split node: replace x with its parent s (or new internal node)
         // make new node y of the same type as x
         // and make x and y children of the new node
-        b_internal * s = x->parent_ ? x->parent_ : new b_internal();
-        b_node_ptr y;
+        internal_t * s = x->parent_ ? dynamic_cast<internal_t *>(x->parent_) : new internal_t();
+        detail::b_node_ptr y;
 
         if (is_leaf(x))
         {
-            b_leaf * x_leaf = dynamic_cast<b_leaf *>(x);
-            b_leaf * y_leaf = new b_leaf();
+            leaf_t * x_leaf = dynamic_cast<leaf_t *>(x);
+            leaf_t * y_leaf = new leaf_t();
 
             auto split_by_it = x_leaf->values_.begin();
             for (size_t i = 0; i < t - 1; ++i)
@@ -149,8 +155,8 @@ private:
         }
         else
         {
-            b_internal * x_int = dynamic_cast<b_internal *>(x);
-            b_internal * y_int = new b_internal();
+            internal_t * x_int = dynamic_cast<internal_t *>(x);
+            internal_t * y_int = new internal_t();
 
             auto split_keys = x_int->keys_.begin() + (t - 1);
             auto split_children = x_int->children_.begin() + t;
@@ -203,9 +209,9 @@ private:
     }
 
     template <typename OutIter>
-    OutIter remove_leaf(b_leaf * leaf, OutIter out)
+    OutIter remove_leaf(leaf_t * leaf, OutIter out)
     {
-        b_internal * parent = leaf->parent_;
+        internal_t * parent = dynamic_cast<internal_t *>(leaf->parent_);
 
         if (parent)
         {
@@ -243,11 +249,13 @@ private:
         return out;
     }
 
-    b_internal * merge_brothers(b_internal * left_brother, std::size_t i, b_internal * right_brother)
+    internal_t * merge_brothers(internal_t * left_brother, std::size_t i, internal_t * right_brother)
     {
         assert(left_brother->parent_ == right_brother->parent_);
-        assert(left_brother->parent_->children_[i] == left_brother);
-        assert(left_brother->parent_->parent_ == nullptr || left_brother->parent_->size() > t - 1);
+        internal_t * parent = dynamic_cast<internal_t *>(left_brother->parent_);
+
+        assert(parent->children_[i] == left_brother);
+        assert(parent->parent_ == nullptr || parent->size() > t - 1);
 
         // Move children from right brother to the node
         for (auto child_it = right_brother->children_.begin();
@@ -259,8 +267,8 @@ private:
         }
 
         // Move key from parent to the node
-        left_brother->keys_.push_back(std::move(left_brother->parent_->keys_[i]));
-        left_brother->parent_->keys_.erase(left_brother->parent_->keys_.begin() + i);
+        left_brother->keys_.push_back(std::move(parent->keys_[i]));
+        parent->keys_.erase(parent->keys_.begin() + i);
 
         // Move keys from right brother to the node
         for (auto key_it = right_brother->keys_.begin();
@@ -269,30 +277,30 @@ private:
             left_brother->keys_.push_back(std::move(*key_it));
 
         // Remove link to right brother from parent
-        left_brother->parent_->children_.erase(left_brother->parent_->children_.begin() + i + 1);
+        parent->children_.erase(parent->children_.begin() + i + 1);
 
         // Delete right brother
         delete right_brother;
 
         // If parent became empty (could happen only if it is root and had only one key)
         // then make the node new root
-        if (left_brother->parent_->size() == 0)
+        if (parent->size() == 0)
         {
             root_ = left_brother;
-            delete left_brother->parent_;
+            delete parent;
             left_brother->parent_ = nullptr;
         }
 
         return left_brother;
     }
 
-    b_internal * ensure_enough_keys(b_internal * node)
+    internal_t * ensure_enough_keys(internal_t * node)
     {
         if (node->parent_ != nullptr)
         {
             if (node->keys_.size() == t - 1)
             {
-                b_internal * parent = node->parent_;
+                internal_t * parent = dynamic_cast<internal_t *>(node->parent_);
 
                 // Find parent link to it
                 auto it = std::find(parent->children_.begin(), parent->children_.end(), node);
@@ -301,7 +309,7 @@ private:
                 // Check brothers
                 if (i + 1 <= parent->size())
                 {
-                    b_internal * right_brother = dynamic_cast<b_internal *>(parent->children_[i + 1]);
+                    internal_t * right_brother = dynamic_cast<internal_t *>(parent->children_[i + 1]);
 
                     if (right_brother->keys_.size() >= t)
                     {
@@ -320,7 +328,7 @@ private:
                 }
                 else
                 {
-                    b_internal * left_brother = dynamic_cast<b_internal *>(parent->children_[i - 1]);
+                    internal_t * left_brother = dynamic_cast<internal_t *>(parent->children_[i - 1]);
 
                     if (left_brother->keys_.size() >= t)
                     {
@@ -343,10 +351,10 @@ private:
         return node;
     }
 
-    b_node_ptr get_root()
+    detail::b_node_ptr get_root()
     {
         if (!root_)
-            root_ = new b_leaf();
+            root_ = new leaf_t();
 
         return root_;
     }
