@@ -34,7 +34,10 @@ struct b_tree
         }
 
         b_leaf * leaf = dynamic_cast<b_leaf *>(node);
-        leaf->values_[key] = value;
+
+        auto v = std::make_pair(std::move(key), std::move(value));
+        auto it = std::lower_bound(leaf->values_.begin(), leaf->values_.end(), v);
+        leaf->values_.insert(it, std::move(v));
     }
 
     template <typename OutIter>
@@ -68,7 +71,7 @@ private:
 
     struct b_leaf : b_node
     {
-        std::map<Key, Value> values_;
+        std::vector<std::pair<Key, Value> > values_;
 
         virtual std::size_t size() const
         {
@@ -139,7 +142,7 @@ private:
             }
 
             for (auto it = split_by_it; it != x_leaf->values_.end(); ++it)
-                y_leaf->values_[it->first] = std::move(it->second);
+                y_leaf->values_.push_back(std::move(*it));
             x_leaf->values_.erase(split_by_it, x_leaf->values_.end());
 
             y = y_leaf;
