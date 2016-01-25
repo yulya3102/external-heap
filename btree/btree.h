@@ -20,6 +20,8 @@ struct b_node
     b_internal<Key> * parent_;
 
     virtual ~b_node() = default;
+
+    virtual b_node_ptr split_full(b_internal<Key> * parent, size_t t) = 0;
 };
 
 template <typename Key>
@@ -36,6 +38,31 @@ struct b_leaf : b_node<Key>
     }
 
     virtual ~b_leaf() = default;
+
+    b_leaf<Key, Value> * split_full(b_internal<Key> * parent, size_t t)
+    {
+        assert(this->parent_ == nullptr || this->parent_ == parent);
+
+        b_leaf<Key, Value> * brother = new b_leaf<Key, Value>();
+
+        auto split_by_it = this->values_.begin();
+        for (size_t i = 0; i < t - 1; ++i)
+            ++split_by_it;
+
+        {
+            // Insert new key after one pointing to x
+            auto this_it = std::find(parent->children_.begin(), parent->children_.end(), this);
+            size_t this_i = this_it - parent->children_.begin();
+            auto this_key_it = parent->keys_.begin() + this_i;
+            parent->keys_.insert(this_key_it, split_by_it->first);
+        }
+
+        for (auto it = split_by_it; it != this->values_.end(); ++it)
+            brother->values_.push_back(std::move(*it));
+        this->values_.erase(split_by_it, this->values_.end());
+
+        return brother;
+    }
 };
 
 template<typename Key>
@@ -50,6 +77,32 @@ struct b_internal : b_node<Key>
     }
 
     virtual ~b_internal() = default;
+
+    b_internal<Key> * split_full(b_internal<Key> * parent, size_t t)
+    {
+        assert(this->parent_ == nullptr || this->parent_ == parent);
+
+        b_internal<Key> * brother = new b_internal<Key>();
+
+        auto split_keys = this->keys_.begin() + (t - 1);
+        auto split_children = this->children_.begin() + t;
+
+        parent->keys_.push_back(std::move(*split_keys));
+
+        for (auto it_keys = split_keys + 1; it_keys != this->keys_.end(); ++it_keys)
+            brother->keys_.push_back(std::move(*it_keys));
+
+        for (auto it_children = split_children; it_children != this->children_.end(); ++it_children)
+        {
+            brother->children_.push_back(std::move(*it_children));
+            brother->children_.back()->parent_ = brother;
+        }
+
+        this->keys_.erase(split_keys, this->keys_.end());
+        this->children_.erase(split_children, this->children_.end());
+
+        return brother;
+    }
 };
 }
 
@@ -134,55 +187,7 @@ private:
         // make new node y of the same type as x
         // and make x and y children of the new node
         internal_t * s = x->parent_ ? x->parent_ : new internal_t();
-        b_node_ptr y;
-
-        if (is_leaf(x))
-        {
-            leaf_t * x_leaf = dynamic_cast<leaf_t *>(x);
-            leaf_t * y_leaf = new leaf_t();
-
-            auto split_by_it = x_leaf->values_.begin();
-            for (size_t i = 0; i < t - 1; ++i)
-                ++split_by_it;
-
-            {
-                // Insert new key after one pointing to x
-                auto x_it = std::find(s->children_.begin(), s->children_.end(), x);
-                size_t x_i = x_it - s->children_.begin();
-                auto x_key_it = s->keys_.begin() + x_i;
-                s->keys_.insert(x_key_it, split_by_it->first);
-            }
-
-            for (auto it = split_by_it; it != x_leaf->values_.end(); ++it)
-                y_leaf->values_.push_back(std::move(*it));
-            x_leaf->values_.erase(split_by_it, x_leaf->values_.end());
-
-            y = y_leaf;
-        }
-        else
-        {
-            internal_t * x_int = dynamic_cast<internal_t *>(x);
-            internal_t * y_int = new internal_t();
-
-            auto split_keys = x_int->keys_.begin() + (t - 1);
-            auto split_children = x_int->children_.begin() + t;
-
-            s->keys_.push_back(std::move(*split_keys));
-
-            for (auto it_keys = split_keys + 1; it_keys != x_int->keys_.end(); ++it_keys)
-                y_int->keys_.push_back(std::move(*it_keys));
-
-            for (auto it_children = split_children; it_children != x_int->children_.end(); ++it_children)
-            {
-                y_int->children_.push_back(std::move(*it_children));
-                y_int->children_.back()->parent_ = y_int;
-            }
-
-            x_int->keys_.erase(split_keys, x_int->keys_.end());
-            x_int->children_.erase(split_children, x_int->children_.end());
-
-            y = y_int;
-        }
+        b_node_ptr y = x->split_full(s, t);
 
         // Make correct links from s to x and y
         // and update s, x and y links to parents
