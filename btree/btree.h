@@ -16,7 +16,7 @@ struct b_tree
 
     void add(Key && key, Value && value)
     {
-        b_node_ptr node = root_;
+        b_node_ptr node = get_root();
 
         if (node->size() == 2 * t - 1)
             node = split_full(node);
@@ -43,7 +43,7 @@ struct b_tree
     template <typename OutIter>
     OutIter remove_left_leaf(OutIter out)
     {
-        b_node_ptr node = root_;
+        b_node_ptr node = get_root();
 
         while (!is_leaf(node))
         {
@@ -341,6 +341,14 @@ private:
             }
         }
         return node;
+    }
+
+    b_node_ptr get_root()
+    {
+        if (!root_)
+            root_ = new b_leaf();
+
+        return root_;
     }
 };
 }
