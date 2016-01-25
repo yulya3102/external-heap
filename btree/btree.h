@@ -184,34 +184,42 @@ private:
             y = y_int;
         }
 
-        // Replace link from s to x with two links: to x and y
-        // or just add two new links if s is empty
+        // Make correct links from s to x and y
+        // and update s, x and y links to parents
+        update_parent(s, x, y);
+
+        return s;
+    }
+
+    void update_parent(internal_t * parent, b_node_ptr old_child, b_node_ptr new_child)
+    {
+        // Replace link from parent to old child with two links:
+        // to old child and to new child
+        // or just add two new links if parent is empty
         {
-            auto it = std::find(s->children_.begin(), s->children_.end(), x);
-            // *it == x || it == end
-            if (it != s->children_.end())
-                it = s->children_.erase(it);
-            // *it == element after x
+            auto it = std::find(parent->children_.begin(), parent->children_.end(), old_child);
+            // *it == old_child || it == end
+            if (it != parent->children_.end())
+                it = parent->children_.erase(it);
+            // *it == element after old_child
             // insert before it
-            it = s->children_.insert(it, y);
-            // *it == y
+            it = parent->children_.insert(it, new_child);
+            // *it == new_child
             // insert before it
-            it = s->children_.insert(it, x);
-            // *it == x
+            it = parent->children_.insert(it, old_child);
+            // *it == old_child
         }
 
         // Update root link if necessary
-        if (!x->parent_)
+        if (!old_child->parent_)
         {
-            root_ = s;
-            s->parent_ = nullptr;
+            root_ = parent;
+            parent->parent_ = nullptr;
         }
 
-        // Update s, x and y parent links
-        x->parent_ = s;
-        y->parent_ = s;
-
-        return s;
+        // Update old child and new child parent links
+        old_child->parent_ = parent;
+        new_child->parent_ = parent;
     }
 
     template <typename OutIter>
