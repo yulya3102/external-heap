@@ -7,17 +7,18 @@
 
 namespace detail
 {
-template <typename Key>
+template <typename Key, typename Value>
 struct b_internal;
 
-template <typename Key>
+template <typename Key, typename Value>
 struct b_node
 {
     using b_node_ptr = b_node *;
+    using b_internal_ptr = b_internal<Key, Value> *;
 
     virtual std::size_t size() const = 0;
 
-    b_internal<Key> * parent_;
+    b_internal_ptr parent_;
 
     virtual ~b_node() = default;
 
@@ -25,11 +26,11 @@ struct b_node
     // make new node (right brother) of the same type as the node
     // and make the node and its new brother children of the new internal node
     // Then return new parent of the node
-    virtual b_internal<Key> * split_full(size_t t, b_node_ptr & tree_root) = 0;
+    virtual b_internal_ptr split_full(size_t t, b_node_ptr & tree_root) = 0;
 
     // Make correct links from (maybe new) parent to the node and its new right brother
     // and update all parent links and root link if necessary
-    void update_parent(b_internal<Key> * parent, b_node_ptr new_brother, b_node_ptr & tree_root)
+    void update_parent(b_internal_ptr parent, b_node_ptr new_brother, b_node_ptr & tree_root)
     {
         // Replace link from parent to old child with two links:
         // to old child and to new child
@@ -61,11 +62,11 @@ struct b_node
     }
 };
 
-template <typename Key>
-using b_node_ptr = typename b_node<Key>::b_node_ptr;
+template <typename Key, typename Value>
+using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
 
 template <typename Key, typename Value>
-struct b_leaf : b_node<Key>
+struct b_leaf : b_node<Key, Value>
 {
     std::vector<std::pair<Key, Value> > values_;
 
@@ -76,12 +77,12 @@ struct b_leaf : b_node<Key>
 
     virtual ~b_leaf() = default;
 
-    b_internal<Key> * split_full(size_t t, b_node<Key> * & tree_root)
+    b_internal<Key, Value> * split_full(size_t t, b_node<Key, Value> * & tree_root)
     {
         assert(this->size() == 2 * t - 1);
         assert(!this->parent_ || this->parent_->size() < 2 * t - 1);
 
-        b_internal<Key> * parent = this->parent_ ? this->parent_ : new b_internal<Key>();
+        b_internal<Key, Value> * parent = this->parent_ ? this->parent_ : new b_internal<Key, Value>();
         b_leaf<Key, Value> * brother = new b_leaf<Key, Value>();
 
         auto split_by_it = this->values_.begin();
@@ -117,11 +118,11 @@ struct b_leaf : b_node<Key>
     }
 };
 
-template<typename Key>
-struct b_internal : b_node<Key>
+template <typename Key, typename Value>
+struct b_internal : b_node<Key, Value>
 {
     std::vector<Key> keys_;
-    std::vector<b_node_ptr<Key> > children_;
+    std::vector<b_node_ptr<Key, Value> > children_;
 
     virtual std::size_t size() const
     {
@@ -130,13 +131,13 @@ struct b_internal : b_node<Key>
 
     virtual ~b_internal() = default;
 
-    b_internal<Key> * split_full(size_t t, b_node<Key> * & tree_root)
+    b_internal<Key, Value> * split_full(size_t t, b_node<Key, Value> * & tree_root)
     {
         assert(this->size() == 2 * t - 1);
         assert(!this->parent_ || this->parent_->size() < 2 * t - 1);
 
-        b_internal<Key> * parent = this->parent_ ? this->parent_ : new b_internal<Key>();
-        b_internal<Key> * brother = new b_internal<Key>();
+        b_internal<Key, Value> * parent = this->parent_ ? this->parent_ : new b_internal<Key, Value>();
+        b_internal<Key, Value> * brother = new b_internal<Key, Value>();
 
         auto split_keys = this->keys_.begin() + (t - 1);
         auto split_children = this->children_.begin() + t;
@@ -221,11 +222,11 @@ struct b_tree
     }
 
 private:
-    using b_node_ptr = detail::b_node_ptr<Key>;
+    using b_node_ptr = detail::b_node_ptr<Key, Value>;
     b_node_ptr root_;
 
     using leaf_t = detail::b_leaf<Key, Value>;
-    using internal_t = detail::b_internal<Key>;
+    using internal_t = detail::b_internal<Key, Value>;
 
     bool is_leaf(b_node_ptr x)
     {
