@@ -68,6 +68,8 @@ using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
 template <typename Key, typename Value>
 struct b_leaf : b_node<Key, Value>
 {
+    using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
+
     std::vector<std::pair<Key, Value> > values_;
 
     virtual std::size_t size() const
@@ -77,12 +79,12 @@ struct b_leaf : b_node<Key, Value>
 
     virtual ~b_leaf() = default;
 
-    b_internal<Key, Value> * split_full(size_t t, b_node<Key, Value> * & tree_root)
+    b_internal_ptr split_full(size_t t, b_node<Key, Value> * & tree_root)
     {
         assert(this->size() == 2 * t - 1);
         assert(!this->parent_ || this->parent_->size() < 2 * t - 1);
 
-        b_internal<Key, Value> * parent = this->parent_ ? this->parent_ : new b_internal<Key, Value>();
+        b_internal_ptr parent = this->parent_ ? this->parent_ : new b_internal<Key, Value>();
         b_leaf<Key, Value> * brother = new b_leaf<Key, Value>();
 
         auto split_by_it = this->values_.begin();
@@ -121,6 +123,8 @@ struct b_leaf : b_node<Key, Value>
 template <typename Key, typename Value>
 struct b_internal : b_node<Key, Value>
 {
+    using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
+
     std::vector<Key> keys_;
     std::vector<b_node_ptr<Key, Value> > children_;
 
@@ -131,13 +135,13 @@ struct b_internal : b_node<Key, Value>
 
     virtual ~b_internal() = default;
 
-    b_internal<Key, Value> * split_full(size_t t, b_node<Key, Value> * & tree_root)
+    b_internal_ptr split_full(size_t t, b_node<Key, Value> * & tree_root)
     {
         assert(this->size() == 2 * t - 1);
         assert(!this->parent_ || this->parent_->size() < 2 * t - 1);
 
-        b_internal<Key, Value> * parent = this->parent_ ? this->parent_ : new b_internal<Key, Value>();
-        b_internal<Key, Value> * brother = new b_internal<Key, Value>();
+        b_internal_ptr parent = this->parent_ ? this->parent_ : new b_internal<Key, Value>();
+        b_internal_ptr brother = new b_internal<Key, Value>();
 
         auto split_keys = this->keys_.begin() + (t - 1);
         auto split_children = this->children_.begin() + t;
