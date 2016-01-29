@@ -21,7 +21,11 @@ struct b_node
 
     virtual ~b_node() = default;
 
-    virtual b_node_ptr split_full(b_internal<Key> * parent, size_t t) = 0;
+    // Split node: replace the node with its parent (or new internal node)
+    // make new node (right brother) of the same type as the node
+    // and make the node and its new brother children of the new internal node
+    // Then return new parent of the node
+    virtual b_internal<Key> * split_full(size_t t, b_node_ptr & tree_root) = 0;
 
     // Make correct links from (maybe new) parent to the node and its new right brother
     // and update all parent links and root link if necessary
@@ -72,10 +76,12 @@ struct b_leaf : b_node<Key>
 
     virtual ~b_leaf() = default;
 
-    b_leaf<Key, Value> * split_full(b_internal<Key> * parent, size_t t)
+    b_internal<Key> * split_full(size_t t, b_node<Key> * & tree_root)
     {
-        assert(this->parent_ == nullptr || this->parent_ == parent);
+        assert(this->size() == 2 * t - 1);
+        assert(!this->parent_ || this->parent_->size() < 2 * t - 1);
 
+        b_internal<Key> * parent = this->parent_ ? this->parent_ : new b_internal<Key>();
         b_leaf<Key, Value> * brother = new b_leaf<Key, Value>();
 
         auto split_by_it = this->values_.begin();
@@ -94,7 +100,11 @@ struct b_leaf : b_node<Key>
             brother->values_.push_back(std::move(*it));
         this->values_.erase(split_by_it, this->values_.end());
 
-        return brother;
+        // Make correct links from parent to the node and its new brother
+        // and update all parent links
+        this->update_parent(parent, brother, tree_root);
+
+        return this->parent_;
     }
 };
 
@@ -111,10 +121,12 @@ struct b_internal : b_node<Key>
 
     virtual ~b_internal() = default;
 
-    b_internal<Key> * split_full(b_internal<Key> * parent, size_t t)
+    b_internal<Key> * split_full(size_t t, b_node<Key> * & tree_root)
     {
-        assert(this->parent_ == nullptr || this->parent_ == parent);
+        assert(this->size() == 2 * t - 1);
+        assert(!this->parent_ || this->parent_->size() < 2 * t - 1);
 
+        b_internal<Key> * parent = this->parent_ ? this->parent_ : new b_internal<Key>();
         b_internal<Key> * brother = new b_internal<Key>();
 
         auto split_keys = this->keys_.begin() + (t - 1);
@@ -134,7 +146,11 @@ struct b_internal : b_node<Key>
         this->keys_.erase(split_keys, this->keys_.end());
         this->children_.erase(split_children, this->children_.end());
 
-        return brother;
+        // Make correct links from parent to the node and its new brother
+        // and update all parent links
+        this->update_parent(parent, brother, tree_root);
+
+        return this->parent_;
     }
 };
 }
@@ -153,7 +169,7 @@ struct b_tree
         b_node_ptr node = get_root();
 
         if (node->size() == 2 * t - 1)
-            node = split_full(node);
+            node = node->split_full(t, root_);
 
         while (!is_leaf(node))
         {
@@ -164,7 +180,7 @@ struct b_tree
             node = int_node->children_[i];
 
             if (node->size() == 2 * t - 1)
-                node = split_full(node);
+                node = node->split_full(t, root_);
         }
 
         leaf_t * leaf = dynamic_cast<leaf_t *>(node);
@@ -209,24 +225,6 @@ private:
     {
         leaf_t * leaf = dynamic_cast<leaf_t *>(x);
         return leaf != nullptr;
-    }
-
-    b_node_ptr split_full(b_node_ptr x)
-    {
-        assert(x->size() == 2 * t - 1);
-        assert(!x->parent_ || x->parent_->size() < 2 * t - 1);
-
-        // Split node: replace x with its parent s (or new internal node)
-        // make new node y of the same type as x
-        // and make x and y children of the new node
-        internal_t * s = x->parent_ ? x->parent_ : new internal_t();
-        b_node_ptr y = x->split_full(s, t);
-
-        // Make correct links from s to x and y
-        // and update s, x and y links to parents
-        x->update_parent(s, y, root_);
-
-        return s;
     }
 
     template <typename OutIter>
