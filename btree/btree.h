@@ -60,6 +60,8 @@ struct b_node
         this->parent_ = parent;
         new_brother->parent_ = parent;
     }
+
+    virtual void add(Key && key, Value && value, size_t t, b_node_ptr & tree_root) = 0;
 };
 
 template <typename Key, typename Value>
@@ -69,6 +71,7 @@ template <typename Key, typename Value>
 struct b_leaf : b_node<Key, Value>
 {
     using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
+    using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
 
     std::vector<std::pair<Key, Value> > values_;
 
@@ -79,7 +82,7 @@ struct b_leaf : b_node<Key, Value>
 
     virtual ~b_leaf() = default;
 
-    b_internal_ptr split_full(size_t t, b_node<Key, Value> * & tree_root)
+    b_internal_ptr split_full(size_t t, b_node_ptr & tree_root)
     {
         assert(this->size() == 2 * t - 1);
         assert(!this->parent_ || this->parent_->size() < 2 * t - 1);
@@ -110,13 +113,17 @@ struct b_leaf : b_node<Key, Value>
         return this->parent_;
     }
 
-    void add(Key && key, Value && value, size_t t)
+    virtual void add(Key && key, Value && value, size_t t, b_node_ptr & tree_root)
     {
-        assert(this->size() < 2 * t - 1);
-
-        auto v = std::make_pair(std::move(key), std::move(value));
-        auto it = std::lower_bound(this->values_.begin(), this->values_.end(), v);
-        this->values_.insert(it, std::move(v));
+        if (size() == 2 * t - 1)
+            split_full(t, tree_root)
+                    -> add(std::move(key), std::move(value), t, tree_root);
+        else
+        {
+            auto v = std::make_pair(std::move(key), std::move(value));
+            auto it = std::lower_bound(this->values_.begin(), this->values_.end(), v);
+            this->values_.insert(it, std::move(v));
+        }
     }
 };
 
@@ -124,9 +131,10 @@ template <typename Key, typename Value>
 struct b_internal : b_node<Key, Value>
 {
     using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
+    using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
 
     std::vector<Key> keys_;
-    std::vector<b_node_ptr<Key, Value> > children_;
+    std::vector<b_node_ptr> children_;
 
     virtual std::size_t size() const
     {
@@ -135,7 +143,7 @@ struct b_internal : b_node<Key, Value>
 
     virtual ~b_internal() = default;
 
-    b_internal_ptr split_full(size_t t, b_node<Key, Value> * & tree_root)
+    b_internal_ptr split_full(size_t t, b_node_ptr & tree_root)
     {
         assert(this->size() == 2 * t - 1);
         assert(!this->parent_ || this->parent_->size() < 2 * t - 1);
@@ -169,6 +177,22 @@ struct b_internal : b_node<Key, Value>
 
         return this->parent_;
     }
+
+    virtual void add(Key && key, Value && value, size_t t, b_node_ptr & tree_root)
+    {
+        assert(std::is_sorted(keys_.begin(), keys_.end()));
+
+        if (size() == 2 * t - 1)
+            split_full(t, tree_root)
+                    -> add(std::move(key), std::move(value), t, tree_root);
+        else
+        {
+            auto it = std::lower_bound(keys_.begin(), keys_.end(), key);
+            std::size_t i = it - keys_.begin();
+            children_[i]
+                    -> add(std::move(key), std::move(value), t, tree_root);
+        }
+    }
 };
 }
 
@@ -183,26 +207,7 @@ struct b_tree
 
     void add(Key && key, Value && value)
     {
-        b_node_ptr node = get_root();
-
-        if (node->size() == 2 * t - 1)
-            node = node->split_full(t, root_);
-
-        while (!is_leaf(node))
-        {
-            internal_t * int_node = dynamic_cast<internal_t *>(node);
-            assert(std::is_sorted(int_node->keys_.begin(), int_node->keys_.end()));
-
-            auto it = std::lower_bound(int_node->keys_.begin(), int_node->keys_.end(), key);
-            std::size_t i = it - int_node->keys_.begin();
-            node = int_node->children_[i];
-
-            if (node->size() == 2 * t - 1)
-                node = node->split_full(t, root_);
-        }
-
-        leaf_t * leaf = dynamic_cast<leaf_t *>(node);
-        leaf->add(std::move(key), std::move(value), t);
+        get_root()->add(std::move(key), std::move(value), t, root_);
     }
 
     template <typename OutIter>
