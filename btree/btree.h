@@ -106,6 +106,15 @@ struct b_leaf : b_node<Key>
 
         return this->parent_;
     }
+
+    void add(Key && key, Value && value, size_t t)
+    {
+        assert(this->size() < 2 * t - 1);
+
+        auto v = std::make_pair(std::move(key), std::move(value));
+        auto it = std::lower_bound(this->values_.begin(), this->values_.end(), v);
+        this->values_.insert(it, std::move(v));
+    }
 };
 
 template<typename Key>
@@ -184,10 +193,7 @@ struct b_tree
         }
 
         leaf_t * leaf = dynamic_cast<leaf_t *>(node);
-
-        auto v = std::make_pair(std::move(key), std::move(value));
-        auto it = std::lower_bound(leaf->values_.begin(), leaf->values_.end(), v);
-        leaf->values_.insert(it, std::move(v));
+        leaf->add(std::move(key), std::move(value), t);
     }
 
     template <typename OutIter>
