@@ -22,6 +22,39 @@ struct b_node
     virtual ~b_node() = default;
 
     virtual b_node_ptr split_full(b_internal<Key> * parent, size_t t) = 0;
+
+    // Make correct links from (maybe new) parent to the node and its new right brother
+    // and update all parent links and root link if necessary
+    void update_parent(b_internal<Key> * parent, b_node_ptr new_brother, b_node_ptr & tree_root)
+    {
+        // Replace link from parent to old child with two links:
+        // to old child and to new child
+        // or just add two new links if parent is empty
+        {
+            auto it = std::find(parent->children_.begin(), parent->children_.end(), this);
+            // *it == this || it == end
+            if (it != parent->children_.end())
+                it = parent->children_.erase(it);
+            // *it == element after this
+            // insert before it
+            it = parent->children_.insert(it, new_brother);
+            // *it == new_brother
+            // insert before it
+            it = parent->children_.insert(it, this);
+            // *it == this
+        }
+
+        // Update root link if necessary
+        if (!this->parent_)
+        {
+            tree_root = parent;
+            parent->parent_ = nullptr;
+        }
+
+        // Update old child and new child parent links
+        this->parent_ = parent;
+        new_brother->parent_ = parent;
+    }
 };
 
 template <typename Key>
@@ -191,40 +224,9 @@ private:
 
         // Make correct links from s to x and y
         // and update s, x and y links to parents
-        update_parent(s, x, y);
+        x->update_parent(s, y, root_);
 
         return s;
-    }
-
-    void update_parent(internal_t * parent, b_node_ptr old_child, b_node_ptr new_child)
-    {
-        // Replace link from parent to old child with two links:
-        // to old child and to new child
-        // or just add two new links if parent is empty
-        {
-            auto it = std::find(parent->children_.begin(), parent->children_.end(), old_child);
-            // *it == old_child || it == end
-            if (it != parent->children_.end())
-                it = parent->children_.erase(it);
-            // *it == element after old_child
-            // insert before it
-            it = parent->children_.insert(it, new_child);
-            // *it == new_child
-            // insert before it
-            it = parent->children_.insert(it, old_child);
-            // *it == old_child
-        }
-
-        // Update root link if necessary
-        if (!old_child->parent_)
-        {
-            root_ = parent;
-            parent->parent_ = nullptr;
-        }
-
-        // Update old child and new child parent links
-        old_child->parent_ = parent;
-        new_child->parent_ = parent;
     }
 
     template <typename OutIter>
