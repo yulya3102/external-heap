@@ -145,8 +145,11 @@ struct b_internal : b_node<Key, Value>
 
         auto split_keys = this->keys_.begin() + (t - 1);
         auto split_children = this->children_.begin() + t;
+        auto it = std::find(parent->children_.begin(), parent->children_.end(), this);
+        auto i = it - parent->children_.begin();
+        auto i_key = parent->keys_.begin() + i;
 
-        parent->keys_.push_back(std::move(*split_keys));
+        parent->keys_.insert(i_key, std::move(*split_keys));
 
         for (auto it_keys = split_keys + 1; it_keys != this->keys_.end(); ++it_keys)
             brother->keys_.push_back(std::move(*it_keys));
@@ -188,6 +191,7 @@ struct b_tree
         while (!is_leaf(node))
         {
             internal_t * int_node = dynamic_cast<internal_t *>(node);
+            assert(std::is_sorted(int_node->keys_.begin(), int_node->keys_.end()));
 
             auto it = std::lower_bound(int_node->keys_.begin(), int_node->keys_.end(), key);
             std::size_t i = it - int_node->keys_.begin();
