@@ -61,6 +61,36 @@ TEST(btree, repeating)
         EXPECT_LE(*it1, *it2);
 }
 
+TEST(btree, random)
+{
+    bptree::b_tree<int, std::string, 5> tree;
+    std::vector<std::pair<int, std::string> > src, dest;
+
+    std::default_random_engine generator;
+    std::uniform_int_distribution<std::int64_t> distribution(1, 1000000);
+    std::function<int()> random = std::bind(distribution, generator);
+
+    std::size_t size = random() * 1000;
+    for (std::size_t i = 0; i < size; ++i)
+    {
+        src.push_back(std::make_pair(random(), std::to_string(random())));
+        tree.add(int(src.back().first), std::string(src.back().second));
+    }
+
+    auto out = std::back_inserter(dest);
+    while (!tree.empty())
+        out = tree.remove_left_leaf(out);
+
+    std::sort(src.begin(), src.end());
+
+    std::vector<int> src_keys, dest_keys;
+    auto src_keys_it = std::back_inserter(src_keys),
+            dest_keys_it = std::back_inserter(dest_keys);
+    std::transform(src.begin(), src.end(), src_keys_it, [](std::pair<int, std::string> x){ return x.first; });
+    std::transform(dest.begin(), dest.end(), dest_keys_it, [](std::pair<int, std::string> x){ return x.first; });
+    EXPECT_EQ(src_keys, dest_keys);
+}
+
 int main(int argc, char ** argv)
 {
     testing::InitGoogleTest(&argc, argv);
