@@ -17,7 +17,7 @@ struct memory
 
     Node * load_node(const node_id & id) const
     {
-        return storage_.at(id).copy();
+        return storage_.at(id)->copy();
 
     }
 
@@ -30,7 +30,7 @@ struct memory
 
     void write_node(const node_id & id, Node * node)
     {
-        storage_[id] = node.copy();
+        storage_[id] = node->copy();
     }
 
 private:
