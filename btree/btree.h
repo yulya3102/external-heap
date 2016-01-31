@@ -46,7 +46,7 @@ struct b_node
     // make new node (right brother) of the same type as the node
     // and make the node and its new brother children of the new internal node
     // Then return new parent of the node
-    virtual storage::node_id split_full(size_t t, boost::optional<storage::node_id> & tree_root) = 0;
+    virtual b_node_ptr split_full(size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 
     // Make correct links from (maybe new) parent to the node and its new right brother
     // and update all parent links and root link if necessary
@@ -111,7 +111,7 @@ struct b_leaf : b_node<Key, Value>
 
     virtual ~b_leaf() = default;
 
-    storage::node_id split_full(size_t t, boost::optional<storage::node_id> & tree_root)
+    b_node_ptr split_full(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(this->size() == 2 * t - 1);
 
@@ -143,18 +143,16 @@ struct b_leaf : b_node<Key, Value>
         // and update all parent links
         this->update_parent(parent, brother, tree_root);
 
-        this->storage_.write_node(parent->id_, parent);
         this->storage_.write_node(brother->id_, brother);
 
-        return *this->parent_;
+        return parent;
     }
 
     virtual void add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (size() == 2 * t - 1)
         {
-            storage::node_id next_id = split_full(t, tree_root);
-            b_node_ptr next = this->storage_.load_node(next_id);
+            b_node_ptr next = split_full(t, tree_root);
             next->add(std::move(key), std::move(value), t, tree_root);
             this->storage_.write_node(next->id_, next);
         }
@@ -192,7 +190,7 @@ struct b_internal : b_node<Key, Value>
 
     virtual ~b_internal() = default;
 
-    storage::node_id split_full(size_t t, boost::optional<storage::node_id> & tree_root)
+    b_node_ptr split_full(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(this->size() == 2 * t - 1);
 
@@ -230,10 +228,9 @@ struct b_internal : b_node<Key, Value>
         // and update all parent links
         this->update_parent(parent, brother, tree_root);
 
-        this->storage_.write_node(parent->id_, parent);
         this->storage_.write_node(brother->id_, brother);
 
-        return *this->parent_;
+        return parent;
     }
 
     virtual void add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
@@ -242,8 +239,7 @@ struct b_internal : b_node<Key, Value>
 
         if (size() == 2 * t - 1)
         {
-            storage::node_id next_id =  split_full(t, tree_root);
-            b_node_ptr next = this->storage_.load_node(next_id);
+            b_node_ptr next =  split_full(t, tree_root);
             next->add(std::move(key), std::move(value), t, tree_root);
             this->storage_.write_node(next->id_, next);
         }
@@ -282,7 +278,7 @@ struct b_tree
             if (node_int->parent_ != nullptr)
                 node_int = ensure_enough_keys(node_int);
 
-            nodes_.write_node(node->id_, node);
+            nodes_.write_node(node_int->id_, node_int);
             node = nodes_.load_node(node_int->children_.front());
         }
 
@@ -446,9 +442,11 @@ private:
                         right_brother->keys_.erase(right_brother->keys_.begin());
 
                         nodes_.write_node(right_brother->id_, right_brother);
+                        nodes_.write_node(parent->id_, parent);
                     }
                     else
                     {
+                        nodes_.write_node(parent->id_, parent);
                         node = merge_brothers(node, i, right_brother);
 
                         // Delete right brother
@@ -474,9 +472,11 @@ private:
                         left_brother->keys_.pop_back();
 
                         nodes_.write_node(left_brother->id_, left_brother);
+                        nodes_.write_node(parent->id_, parent);
                     }
                     else
                     {
+                        nodes_.write_node(parent->id_, parent);
                         left_brother = merge_brothers(left_brother, i - 1, node);
 
                         // Delete right brother
@@ -485,8 +485,6 @@ private:
                         node = left_brother;
                     }
                 }
-
-                nodes_.write_node(parent->id_, parent);
             }
         }
         return node;
