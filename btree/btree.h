@@ -5,6 +5,8 @@
 #include <cassert>
 #include <algorithm>
 
+#include "../storage/memory.h"
+
 namespace detail
 {
 template <typename Key, typename Value>
@@ -18,7 +20,15 @@ struct b_node
 
     virtual std::size_t size() const = 0;
 
+    storage::memory<b_node> & storage_;
+    storage::node_id id_;
     b_internal_ptr parent_;
+
+    b_node(storage::memory<b_node> & storage)
+        : storage_(storage)
+        , id_(storage.new_node())
+        , parent_(nullptr)
+    {}
 
     virtual ~b_node() = default;
 
@@ -75,6 +85,10 @@ struct b_leaf : b_node<Key, Value>
 
     std::vector<std::pair<Key, Value> > values_;
 
+    b_leaf(storage::memory<b_node<Key, Value> > & storage)
+        : b_node<Key, Value>(storage)
+    {}
+
     virtual std::size_t size() const
     {
         return values_.size();
@@ -87,8 +101,8 @@ struct b_leaf : b_node<Key, Value>
         assert(this->size() == 2 * t - 1);
         assert(!this->parent_ || this->parent_->size() < 2 * t - 1);
 
-        b_internal_ptr parent = this->parent_ ? this->parent_ : new b_internal<Key, Value>();
-        b_leaf<Key, Value> * brother = new b_leaf<Key, Value>();
+        b_internal_ptr parent = this->parent_ ? this->parent_ : new b_internal<Key, Value>(this->storage_);
+        b_leaf<Key, Value> * brother = new b_leaf<Key, Value>(this->storage_);
 
         auto split_by_it = this->values_.begin();
         for (size_t i = 0; i < t - 1; ++i)
@@ -136,6 +150,10 @@ struct b_internal : b_node<Key, Value>
     std::vector<Key> keys_;
     std::vector<b_node_ptr> children_;
 
+    b_internal(storage::memory<b_node<Key, Value> > & storage)
+        : b_node<Key, Value>(storage)
+    {}
+
     virtual std::size_t size() const
     {
         return keys_.size();
@@ -148,8 +166,8 @@ struct b_internal : b_node<Key, Value>
         assert(this->size() == 2 * t - 1);
         assert(!this->parent_ || this->parent_->size() < 2 * t - 1);
 
-        b_internal_ptr parent = this->parent_ ? this->parent_ : new b_internal<Key, Value>();
-        b_internal_ptr brother = new b_internal<Key, Value>();
+        b_internal_ptr parent = this->parent_ ? this->parent_ : new b_internal<Key, Value>(this->storage_);
+        b_internal_ptr brother = new b_internal<Key, Value>(this->storage_);
 
         auto split_keys = this->keys_.begin() + (t - 1);
         auto split_children = this->children_.begin() + t;
@@ -202,7 +220,7 @@ template <typename Key, typename Value, int t>
 struct b_tree
 {
     b_tree()
-        : root_(new leaf_t())
+        : root_(new leaf_t(nodes_))
     { }
 
     void add(Key && key, Value && value)
@@ -237,6 +255,8 @@ struct b_tree
 private:
     using b_node_ptr = detail::b_node_ptr<Key, Value>;
     b_node_ptr root_;
+
+    storage::memory<detail::b_node<Key, Value> > nodes_;
 
     using leaf_t = detail::b_leaf<Key, Value>;
     using internal_t = detail::b_internal<Key, Value>;
@@ -393,7 +413,7 @@ private:
     b_node_ptr get_root()
     {
         if (!root_)
-            root_ = new leaf_t();
+            root_ = new leaf_t(nodes_);
 
         return root_;
     }

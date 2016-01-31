@@ -1,25 +1,24 @@
 #pragma once
 
 #include <unordered_map>
+#include <memory>
 
 namespace storage
 {
-template <typename Node>
-struct node_traits {};
+using node_id = std::size_t;
 
 template <typename Node>
 struct memory
 {
-    using node_id = int;
-
     node_id new_node() const
     {
-        return storage_.size();
+        static node_id counter = 0;
+        return counter++;
     }
 
-    Node load_node(const node_id & id) const
+    std::unique_ptr<Node> load_node(const node_id & id) const
     {
-        Node result = node_traits<Node>::deserialize(storage_.at(id));
+        Node result = storage_.at(id);
         return std::move(result);
     }
 
@@ -28,12 +27,12 @@ struct memory
         storage_.erase(id);
     }
 
-    void write_node(const node_id & id, const Node & node)
+    void write_node(const node_id & id, const std::unique_ptr<Node> & node)
     {
-        storage_[id] = node_traits<Node>::serialize(node);
+        storage_[id] = node;
     }
 
 private:
-    std::unordered_map<node_id, typename node_traits<Node>::serialized_t> storage_;
+    std::unordered_map<node_id, std::unique_ptr<Node> > storage_;
 };
 }
