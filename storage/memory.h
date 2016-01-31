@@ -1,7 +1,6 @@
 #pragma once
 
 #include <unordered_map>
-#include <memory>
 
 namespace storage
 {
@@ -16,23 +15,25 @@ struct memory
         return counter++;
     }
 
-    std::unique_ptr<Node> load_node(const node_id & id) const
+    Node * load_node(const node_id & id) const
     {
-        Node result = storage_.at(id);
-        return std::move(result);
+        return storage_.at(id).copy();
+
     }
 
     void delete_node(const node_id & id)
     {
+        Node * deleted = storage_.at(id);
         storage_.erase(id);
+        delete deleted;
     }
 
-    void write_node(const node_id & id, const std::unique_ptr<Node> & node)
+    void write_node(const node_id & id, Node * node)
     {
-        storage_[id] = node;
+        storage_[id] = node.copy();
     }
 
 private:
-    std::unordered_map<node_id, std::unique_ptr<Node> > storage_;
+    std::unordered_map<node_id, Node *> storage_;
 };
 }

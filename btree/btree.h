@@ -19,6 +19,7 @@ struct b_node
     using b_internal_ptr = b_internal<Key, Value> *;
 
     virtual std::size_t size() const = 0;
+    virtual b_node_ptr copy() const = 0;
 
     storage::memory<b_node> & storage_;
     storage::node_id id_;
@@ -94,6 +95,11 @@ struct b_leaf : b_node<Key, Value>
         return values_.size();
     }
 
+    virtual b_leaf * copy() const
+    {
+        return new b_leaf(*this);
+    }
+
     virtual ~b_leaf() = default;
 
     b_internal_ptr split_full(size_t t, b_node_ptr & tree_root)
@@ -157,6 +163,11 @@ struct b_internal : b_node<Key, Value>
     virtual std::size_t size() const
     {
         return keys_.size();
+    }
+
+    virtual b_internal_ptr copy() const
+    {
+        return new b_internal(*this);
     }
 
     virtual ~b_internal() = default;
