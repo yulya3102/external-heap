@@ -153,7 +153,16 @@ struct b_leaf : b_node<Key, Value>
         if (size() == 2 * t - 1)
         {
             b_node_ptr next = split_full(t, tree_root);
+
+            this->storage_.write_node(this->id_, this);
+
             next->add(std::move(key), std::move(value), t, tree_root);
+
+            b_leaf * updated_this = dynamic_cast<b_leaf *>(this->storage_.load_node(this->id_));
+            this->values_ = updated_this->values_;
+            this->id_ = updated_this->id_;
+            this->parent_ = updated_this->parent_;
+
             this->storage_.write_node(next->id_, next);
         }
         else
@@ -239,8 +248,26 @@ struct b_internal : b_node<Key, Value>
 
         if (size() == 2 * t - 1)
         {
-            b_node_ptr next =  split_full(t, tree_root);
+            b_node_ptr next = split_full(t, tree_root);
+
+            /*
+             * Outdated nodes: after function call, every node
+             * except function parameters and return value
+             * is outdated and should be reloaded from storage
+             */
+            // 'this' will be outdated after next->add
+            // so I'll need to reload it
+            // but it can be not in storage yet, so I need to write it
+            this->storage_.write_node(this->id_, this);
+
             next->add(std::move(key), std::move(value), t, tree_root);
+
+            b_internal_ptr updated_this = dynamic_cast<b_internal_ptr>(this->storage_.load_node(this->id_));
+            this->children_ = updated_this->children_;
+            this->keys_ = updated_this->keys_;
+            this->id_ = updated_this->id_;
+            this->parent_ = updated_this->parent_;
+
             this->storage_.write_node(next->id_, next);
         }
         else
@@ -248,7 +275,17 @@ struct b_internal : b_node<Key, Value>
             auto it = std::lower_bound(keys_.begin(), keys_.end(), key);
             std::size_t i = it - keys_.begin();
             b_node_ptr child = this->storage_.load_node(children_[i]);
+
+            this->storage_.write_node(this->id_, this);
+
             child->add(std::move(key), std::move(value), t, tree_root);
+
+            b_internal_ptr updated_this = dynamic_cast<b_internal_ptr>(this->storage_.load_node(this->id_));
+            this->children_ = updated_this->children_;
+            this->keys_ = updated_this->keys_;
+            this->id_ = updated_this->id_;
+            this->parent_ = updated_this->parent_;
+
             this->storage_.write_node(child->id_, child);
         }
     }
