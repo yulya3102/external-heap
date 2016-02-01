@@ -329,9 +329,11 @@ struct b_tree
         {
             internal_t * node_int = dynamic_cast<internal_t *>(node);
             if (node_int->parent_ != nullptr)
+            {
                 node_int = ensure_enough_keys(node_int);
+                nodes_.write_node(node_int->id_, node_int);
+            }
 
-            nodes_.write_node(node_int->id_, node_int);
             node = nodes_.load_node(node_int->children_.front());
             delete node_int;
         }
