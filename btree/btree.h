@@ -21,7 +21,7 @@ struct b_node
     using b_internal_ptr = b_internal<Key, Value> *;
 
     virtual std::size_t size() const = 0;
-    virtual b_node_ptr copy() const = 0;
+    virtual b_node_ptr copy(const storage::memory<b_node> & storage) const = 0;
     virtual void reload() = 0;
 
     storage::memory<b_node> & storage_;
@@ -32,6 +32,12 @@ struct b_node
         : storage_(storage)
         , id_(storage.new_node())
         , parent_(boost::none)
+    {}
+
+    b_node(const b_node & other, storage::memory<b_node> & storage)
+        : storage_(storage)
+        , id_(other.id_)
+        , parent_(other.parent_)
     {}
 
     virtual ~b_node() = default;
@@ -100,14 +106,19 @@ struct b_leaf : b_node<Key, Value>
         : b_node<Key, Value>(storage)
     {}
 
+    b_leaf(const b_leaf & other, storage::memory<b_node<Key, Value> > & storage)
+        : b_node<Key, Value>(other, storage)
+        , values_(other.values_)
+    {}
+
     virtual std::size_t size() const
     {
         return values_.size();
     }
 
-    virtual b_leaf * copy() const
+    virtual b_leaf * copy(const storage::memory<b_node<Key, Value> > & storage) const
     {
-        return new b_leaf(*this);
+        return new b_leaf(*this, const_cast<storage::memory<b_node<Key, Value> > &>(storage));
     }
 
     virtual void reload()
@@ -196,14 +207,20 @@ struct b_internal : b_node<Key, Value>
         : b_node<Key, Value>(storage)
     {}
 
+    b_internal(const b_internal & other, storage::memory<b_node<Key, Value> > & storage)
+        : b_node<Key, Value>(other, storage)
+        , keys_(other.keys_)
+        , children_(other.children_)
+    {}
+
     virtual std::size_t size() const
     {
         return keys_.size();
     }
 
-    virtual b_internal_ptr copy() const
+    virtual b_internal_ptr copy(const storage::memory<b_node<Key, Value> > & storage) const
     {
-        return new b_internal(*this);
+        return new b_internal(*this, const_cast<storage::memory<b_node<Key, Value> > &>(storage));
     }
 
     virtual void reload()

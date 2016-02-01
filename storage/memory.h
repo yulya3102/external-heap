@@ -17,7 +17,7 @@ struct memory
 
     Node * load_node(const node_id & id) const
     {
-        return storage_.at(id)->copy();
+        return storage_.at(id)->copy(*this);
 
     }
 
@@ -34,7 +34,7 @@ struct memory
         Node * old = nullptr;
         if (old_it != storage_.end())
             old = old_it->second;
-        storage_[id] = node->copy();
+        storage_[id] = node->copy(*this);
         delete old;
     }
 
