@@ -9,6 +9,14 @@ using node_id = std::size_t;
 template <typename Node>
 struct memory
 {
+    memory() {}
+
+    memory(const memory<Node> & other)
+    {
+        for (auto x : other.storage_)
+            storage_[x.first] = x.second->copy(*this);
+    }
+
     node_id new_node() const
     {
         static node_id counter = 0;
