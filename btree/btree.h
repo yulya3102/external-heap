@@ -297,7 +297,7 @@ namespace bptree
 template <typename Key, typename Value, int t>
 struct b_tree
 {
-    void add(Key && key, Value && value)
+    void add(Key key, Value value)
     {
         b_node_ptr root = load_root();
         root->add(std::move(key), std::move(value), t, root_);
