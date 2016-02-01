@@ -5,6 +5,19 @@
 #include <iostream>
 #include <functional>
 
+template <typename K, typename V, int t>
+std::vector<std::pair<K, V> > from_tree(bptree::b_tree<K, V, t> & tree)
+{
+    std::vector<std::pair<K, V> > v;
+    auto out = std::back_inserter(v);
+    while (!tree.empty())
+    {
+        out = tree.remove_left_leaf(out);
+    }
+
+    return v;
+}
+
 TEST(btree, init)
 {
     bptree::b_tree<int, int, 3> tree;
@@ -15,12 +28,9 @@ TEST(btree, init)
     for (size_t i = 19; i >= 10; --i)
         tree.add(i, i);
 
-    std::vector<std::pair<int, int> > v;
-    auto out = std::back_inserter(v);
-    while (!tree.empty())
-    {
-        out = tree.remove_left_leaf(out);
-    }
+    std::vector<std::pair<int, int> > v = from_tree(tree);
+    EXPECT_EQ(v.size(), 30);
+    EXPECT_TRUE(std::is_sorted(v.begin(), v.end()));
 }
 
 TEST(btree, repeating)
@@ -39,8 +49,7 @@ TEST(btree, repeating)
     auto v_back = std::back_inserter(v);
     v_back = tree.remove_left_leaf(v_back);
 
-    for (auto it1 = v.begin(), it2 = v.begin() + 1; it2 != v.end(); ++it1, ++it2)
-        EXPECT_LE(*it1, *it2);
+    EXPECT_TRUE(std::is_sorted(v.begin(), v.end()));
 
     for (auto it = v.begin(); it != v.end(); ++it)
         tree.add(int(it->first), std::string(it->second));
@@ -50,15 +59,14 @@ TEST(btree, repeating)
     size_t expected_size = size + v.size();
     v.clear();
 
-    while (!tree.empty())
-        v_back = tree.remove_left_leaf(v_back);
+    v = from_tree(tree);
 
     EXPECT_EQ(v.size(), expected_size);
 
-    EXPECT_EQ(v[0], v[1]);
+    for (std::size_t i = 0; i < expected_size - size; ++i)
+        EXPECT_EQ(v[2 * i], v[2 * i + 1]);
 
-    for (auto it1 = v.begin(), it2 = v.begin() + 1; it2 != v.end(); ++it1, ++it2)
-        EXPECT_LE(*it1, *it2);
+    EXPECT_TRUE(std::is_sorted(v.begin(), v.end()));
 }
 
 TEST(btree, random)
@@ -77,9 +85,7 @@ TEST(btree, random)
         tree.add(int(src.back().first), std::string(src.back().second));
     }
 
-    auto out = std::back_inserter(dest);
-    while (!tree.empty())
-        out = tree.remove_left_leaf(out);
+    dest = from_tree(tree);
 
     std::sort(src.begin(), src.end());
 
