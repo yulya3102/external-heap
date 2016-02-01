@@ -18,7 +18,7 @@ template <typename Key, typename Value>
 struct b_leaf;
 
 template <typename Key, typename Value>
-struct b_node
+struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
 {
     using b_node_ptr = std::shared_ptr<b_node>;
     using b_internal_ptr = std::shared_ptr<b_internal<Key, Value> >;
