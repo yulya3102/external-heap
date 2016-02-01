@@ -4,6 +4,7 @@
 #include <map>
 #include <cassert>
 #include <algorithm>
+#include <queue>
 
 #include <boost/optional.hpp>
 
@@ -15,6 +16,9 @@ template <typename Key, typename Value>
 struct b_internal;
 
 template <typename Key, typename Value>
+struct b_buffer;
+
+template <typename Key, typename Value>
 struct b_leaf;
 
 template <typename Key, typename Value>
@@ -22,6 +26,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
 {
     using b_node_ptr = std::shared_ptr<b_node>;
     using b_internal_ptr = std::shared_ptr<b_internal<Key, Value> >;
+    using b_buffer_ptr = std::shared_ptr<b_buffer<Key, Value> >;
     using b_leaf_ptr = std::shared_ptr<b_leaf<Key, Value> >;
 
     virtual std::size_t size() const = 0;
@@ -143,7 +148,7 @@ struct b_leaf : b_node<Key, Value>
         assert(!parent || parent->size() < 2 * t - 1);
 
         if (!parent)
-            parent = std::make_shared<b_internal<Key, Value> >(this->storage_);
+            parent = std::make_shared<b_buffer<Key, Value> >(this->storage_);
         b_leaf_ptr brother = std::make_shared<b_leaf<Key, Value> >(this->storage_);
 
         auto split_by_it = this->values_.begin();
@@ -285,7 +290,7 @@ struct b_internal : b_node<Key, Value>
         assert(!parent || parent->size() < 2 * t - 1);
 
         if (!parent)
-            parent = std::make_shared<b_internal>(this->storage_);
+            parent = std::make_shared<b_buffer<Key, Value> >(this->storage_);
         b_internal_ptr brother = std::make_shared<b_internal>(this->storage_);
 
         auto split_keys = this->keys_.begin() + (t - 1);
@@ -505,6 +510,78 @@ struct b_internal : b_node<Key, Value>
             -> remove_left_leaf(t, tree_root);
     }
 };
+
+template <typename Key, typename Value>
+struct b_buffer : b_internal<Key, Value>
+{
+    using b_buffer_ptr = typename b_node<Key, Value>::b_buffer_ptr;
+    using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
+    using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
+
+    std::queue<std::pair<Key, Value> > pending_add_;
+
+    b_buffer(storage::memory<b_node<Key, Value> > & storage)
+        : b_internal<Key, Value>(storage)
+    {}
+
+    b_buffer(const b_buffer & other, storage::memory<b_node<Key, Value> > & storage)
+        : b_internal<Key, Value>(other)
+        , pending_add_(other.pending_add_)
+    {}
+
+    virtual std::size_t size() const
+    {
+        return pending_add_.size();
+    }
+
+    virtual b_buffer * copy(const storage::memory<b_node<Key, Value> > & storage) const
+    {
+        return new b_buffer(*this, const_cast<storage::memory<b_node<Key, Value> > & >(storage));
+    }
+
+    virtual void reload()
+    {
+        b_buffer_ptr updated_this = std::dynamic_pointer_cast<b_buffer>(this->storage_.load_node(this->id_));
+        this->children_ = updated_this->children_;
+        this->keys_ = updated_this->keys_;
+        this->id_ = updated_this->id_;
+        this->parent_ = updated_this->parent_;
+        this->pending_add_ = updated_this->pending_add_;
+    }
+
+    void flush(size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        while (!pending_add_.empty())
+        {
+            b_internal<Key, Value>::add(
+                        std::move(pending_add_.front().first),
+                        std::move(pending_add_.front().second),
+                        t,
+                        tree_root);
+            pending_add_.pop();
+        }
+    }
+
+    virtual b_node_ptr split_full(size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        this->flush(t, tree_root);
+        return b_internal<Key, Value>::split_full(t, tree_root);
+    }
+
+    virtual void add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        if (this->size() == t)
+            this->flush(t, tree_root);
+
+        pending_add_.push(std::make_pair(std::move(key), std::move(value)));
+    }
+
+    virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        this->flush(t, tree_root);
+        return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
+    }
+};
 }
 
 namespace bptree
@@ -547,6 +624,7 @@ private:
     using b_node_ptr = typename detail::b_node<Key, Value>::b_node_ptr;
     using b_internal_ptr = typename detail::b_node<Key, Value>::b_internal_ptr;
     using b_leaf_ptr = typename detail::b_node<Key, Value>::b_leaf_ptr;
+    using b_buffer_ptr = typename detail::b_node<Key, Value>::b_buffer_ptr;
 
     boost::optional<storage::node_id> root_;
     storage::memory<detail::b_node<Key, Value> > nodes_;
