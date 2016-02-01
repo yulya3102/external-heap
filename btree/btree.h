@@ -22,6 +22,7 @@ struct b_node
 
     virtual std::size_t size() const = 0;
     virtual b_node_ptr copy() const = 0;
+    virtual void reload() = 0;
 
     storage::memory<b_node> & storage_;
     storage::node_id id_;
@@ -109,6 +110,15 @@ struct b_leaf : b_node<Key, Value>
         return new b_leaf(*this);
     }
 
+    virtual void reload()
+    {
+        b_leaf * updated_this = dynamic_cast<b_leaf *>(this->storage_.load_node(this->id_));
+        this->values_ = updated_this->values_;
+        this->id_ = updated_this->id_;
+        this->parent_ = updated_this->parent_;
+        delete updated_this;
+    }
+
     virtual ~b_leaf() = default;
 
     b_node_ptr split_full(size_t t, boost::optional<storage::node_id> & tree_root)
@@ -158,10 +168,7 @@ struct b_leaf : b_node<Key, Value>
 
             next->add(std::move(key), std::move(value), t, tree_root);
 
-            b_leaf * updated_this = dynamic_cast<b_leaf *>(this->storage_.load_node(this->id_));
-            this->values_ = updated_this->values_;
-            this->id_ = updated_this->id_;
-            this->parent_ = updated_this->parent_;
+            this->reload();
 
             this->storage_.write_node(next->id_, next);
         }
@@ -195,6 +202,16 @@ struct b_internal : b_node<Key, Value>
     virtual b_internal_ptr copy() const
     {
         return new b_internal(*this);
+    }
+
+    virtual void reload()
+    {
+        b_internal_ptr updated_this = dynamic_cast<b_internal_ptr>(this->storage_.load_node(this->id_));
+        this->children_ = updated_this->children_;
+        this->keys_ = updated_this->keys_;
+        this->id_ = updated_this->id_;
+        this->parent_ = updated_this->parent_;
+        delete updated_this;
     }
 
     virtual ~b_internal() = default;
@@ -262,11 +279,7 @@ struct b_internal : b_node<Key, Value>
 
             next->add(std::move(key), std::move(value), t, tree_root);
 
-            b_internal_ptr updated_this = dynamic_cast<b_internal_ptr>(this->storage_.load_node(this->id_));
-            this->children_ = updated_this->children_;
-            this->keys_ = updated_this->keys_;
-            this->id_ = updated_this->id_;
-            this->parent_ = updated_this->parent_;
+            this->reload();
 
             this->storage_.write_node(next->id_, next);
         }
@@ -280,11 +293,7 @@ struct b_internal : b_node<Key, Value>
 
             child->add(std::move(key), std::move(value), t, tree_root);
 
-            b_internal_ptr updated_this = dynamic_cast<b_internal_ptr>(this->storage_.load_node(this->id_));
-            this->children_ = updated_this->children_;
-            this->keys_ = updated_this->keys_;
-            this->id_ = updated_this->id_;
-            this->parent_ = updated_this->parent_;
+            this->reload();
 
             this->storage_.write_node(child->id_, child);
         }
