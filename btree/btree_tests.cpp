@@ -97,10 +97,7 @@ TEST(btree, random)
     EXPECT_EQ(src_keys, dest_keys);
 }
 
-/* This test won't work until I implement storage copying
- * with updating node storage links
- */
-TEST(btree, DISABLED_independent)
+TEST(btree, independent)
 {
     std::default_random_engine generator;
     std::uniform_int_distribution<std::int64_t> distribution(1, 100);
@@ -114,7 +111,7 @@ TEST(btree, DISABLED_independent)
         tree1.add(x, x);
     }
 
-    bptree::b_tree<int, int, 6> tree2 = tree1;
+    bptree::b_tree<int, int, 6> tree2(tree1);
     std::size_t size2 = random() * 10;
     for (std::size_t i = 0; i < size2; ++i)
     {
@@ -124,12 +121,12 @@ TEST(btree, DISABLED_independent)
 
     std::vector<std::pair<int, int> > v;
     auto v_out = std::back_inserter(v);
-    for (std::size_t i = 0; i < size1 / (2 * 6 - 1) + 1; ++i)
+    for (std::size_t i = 0; i < size1 / (6 - 1) + 1; ++i)
         v_out = tree2.remove_left_leaf(v_out);
 
     std::vector<std::pair<int, int> > v1 = from_tree(tree1), v2 = from_tree(tree2);
     EXPECT_EQ(v1.size(), size1);
-    EXPECT_EQ(v2.size(), size2);
+    EXPECT_EQ(v2.size(), size1 + size2 - v.size());
 
     for (auto x : v1)
         EXPECT_EQ(std::find(v2.begin(), v2.end(), x), v2.end());
