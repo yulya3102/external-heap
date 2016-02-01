@@ -24,9 +24,9 @@ struct memory
         return counter++;
     }
 
-    Node * load_node(const node_id & id) const
+    std::shared_ptr<Node> load_node(const node_id & id) const
     {
-        return storage_.at(id)->copy(*this);
+        return std::shared_ptr<Node>(storage_.at(id)->copy(*this));
     }
 
     void delete_node(const node_id & id)
