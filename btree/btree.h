@@ -315,6 +315,50 @@ struct b_internal : b_node<Key, Value>
             this->storage_.write_node(child->id_, child.get());
         }
     }
+
+    void merge_with_right_brother(std::size_t i, b_internal_ptr right_brother, std::size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        assert(this->parent_ == right_brother->parent_);
+        b_internal_ptr parent = this->load_parent();
+
+        assert(parent->children_[i] == this->id_);
+        assert(!parent->parent_ || parent->size() > t - 1);
+
+        // Move children from right brother to the node
+        for (auto child_it = right_brother->children_.begin();
+             child_it != right_brother->children_.end();
+             ++child_it)
+        {
+            b_node_ptr child = this->storage_.load_node(*child_it);
+            child->parent_ = this->id_;
+            this->storage_.write_node(child->id_, child.get());
+            this->children_.push_back(std::move(*child_it));
+        }
+
+        // Move key from parent to the node
+        this->keys_.push_back(std::move(parent->keys_[i]));
+        parent->keys_.erase(parent->keys_.begin() + i);
+
+        // Move keys from right brother to the node
+        for (auto key_it = right_brother->keys_.begin();
+             key_it != right_brother->keys_.end();
+             ++key_it)
+            this->keys_.push_back(std::move(*key_it));
+
+        // Remove link to right brother from parent
+        parent->children_.erase(parent->children_.begin() + i + 1);
+
+        // If parent became empty (could happen only if it is root and had only one key)
+        // then make the node new root
+        if (parent->size() == 0)
+        {
+            tree_root = this->id_;
+            this->storage_.delete_node(parent->id_);
+            this->parent_ = boost::none;
+        }
+        else
+            this->storage_.write_node(parent->id_, parent.get());
+    }
 };
 }
 
@@ -430,52 +474,6 @@ private:
         return out;
     }
 
-    b_internal_ptr merge_brothers(b_internal_ptr left_brother, std::size_t i, b_internal_ptr right_brother)
-    {
-        assert(left_brother->parent_ == right_brother->parent_);
-        b_internal_ptr parent = left_brother->load_parent();
-
-        assert(parent->children_[i] == left_brother->id_);
-        assert(!parent->parent_ || parent->size() > t - 1);
-
-        // Move children from right brother to the node
-        for (auto child_it = right_brother->children_.begin();
-             child_it != right_brother->children_.end();
-             ++child_it)
-        {
-            b_node_ptr child = nodes_.load_node(*child_it);
-            child->parent_ = left_brother->id_;
-            nodes_.write_node(child->id_, child.get());
-            left_brother->children_.push_back(std::move(*child_it));
-        }
-
-        // Move key from parent to the node
-        left_brother->keys_.push_back(std::move(parent->keys_[i]));
-        parent->keys_.erase(parent->keys_.begin() + i);
-
-        // Move keys from right brother to the node
-        for (auto key_it = right_brother->keys_.begin();
-             key_it != right_brother->keys_.end();
-             ++key_it)
-            left_brother->keys_.push_back(std::move(*key_it));
-
-        // Remove link to right brother from parent
-        parent->children_.erase(parent->children_.begin() + i + 1);
-
-        // If parent became empty (could happen only if it is root and had only one key)
-        // then make the node new root
-        if (parent->size() == 0)
-        {
-            root_ = left_brother->id_;
-            nodes_.delete_node(parent->id_);
-            left_brother->parent_ = boost::none;
-        }
-        else
-            nodes_.write_node(parent->id_, parent.get());
-
-        return left_brother;
-    }
-
     b_internal_ptr ensure_enough_keys(b_internal_ptr node)
     {
         if (node->parent_)
@@ -515,7 +513,7 @@ private:
                     else
                     {
                         nodes_.write_node(parent->id_, parent.get());
-                        node = merge_brothers(node, i, right_brother);
+                        node->merge_with_right_brother(i, right_brother, t, root_);
 
                         // Delete right brother
                         nodes_.delete_node(right_brother->id_);
@@ -547,7 +545,7 @@ private:
                     else
                     {
                         nodes_.write_node(parent->id_, parent.get());
-                        left_brother = merge_brothers(left_brother, i - 1, node);
+                        left_brother->merge_with_right_brother(i - 1, node, t, root_);
 
                         // Delete right brother
                         nodes_.delete_node(node->id_);
