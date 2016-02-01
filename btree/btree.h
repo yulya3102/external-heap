@@ -359,6 +359,94 @@ struct b_internal : b_node<Key, Value>
         else
             this->storage_.write_node(parent->id_, parent.get());
     }
+
+    b_internal_ptr ensure_enough_keys(std::size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        if (this->parent_)
+        {
+            if (this->keys_.size() == t - 1)
+            {
+                b_internal_ptr parent = this->load_parent();
+
+                // Find parent link to it
+                auto it = std::find(parent->children_.begin(), parent->children_.end(), this->id_);
+                std::size_t i = it - parent->children_.begin();
+
+                // Check brothers
+                if (i + 1 <= parent->size())
+                {
+                    b_internal_ptr right_brother = std::dynamic_pointer_cast<b_internal>(this->storage_.load_node(parent->children_[i + 1]));
+
+                    if (right_brother->keys_.size() >= t)
+                    {
+                        // Move left child from right brother to the node
+                        this->children_.push_back(std::move(right_brother->children_.front()));
+                        right_brother->children_.erase(right_brother->children_.begin());
+                        {
+                            b_node_ptr child = this->storage_.load_node(this->children_.back());
+                            child->parent_ = this->id_;
+                            this->storage_.write_node(child->id_, child.get());
+                        }
+
+                        // Update keys
+                        this->keys_.push_back(std::move(parent->keys_[i]));
+                        parent->keys_[i] = right_brother->keys_.front();
+                        right_brother->keys_.erase(right_brother->keys_.begin());
+
+                        this->storage_.write_node(right_brother->id_, right_brother.get());
+                        this->storage_.write_node(parent->id_, parent.get());
+                    }
+                    else
+                    {
+                        this->storage_.write_node(parent->id_, parent.get());
+                        this->merge_with_right_brother(i, right_brother, t, tree_root);
+
+                        // Delete right brother
+                        this->storage_.delete_node(right_brother->id_);
+                    }
+                }
+                else
+                {
+                    b_internal_ptr left_brother = std::dynamic_pointer_cast<b_internal>(this->storage_.load_node(parent->children_[i - 1]));
+
+                    if (left_brother->keys_.size() >= t)
+                    {
+                        // Move right child from left brother to the node
+                        this->children_.insert(this->children_.begin(), std::move(left_brother->children_.back()));
+                        left_brother->children_.pop_back();
+                        {
+                            b_node_ptr child = this->storage_.load_node(this->children_.front());
+                            child->parent_ = this->id_;
+                            this->storage_.write_node(child->id_, child.get());
+                        }
+
+                        // Update keys
+                        this->keys_.insert(this->keys_.begin(), std::move(parent->keys_[i - 1]));
+                        parent->keys_[i - 1] = left_brother->keys_.back();
+                        left_brother->keys_.pop_back();
+
+                        this->storage_.write_node(left_brother->id_, left_brother.get());
+                        this->storage_.write_node(parent->id_, parent.get());
+                    }
+                    else
+                    {
+                        this->storage_.write_node(parent->id_, parent.get());
+                        left_brother->merge_with_right_brother(
+                                    i - 1,
+                                    std::dynamic_pointer_cast<b_internal>(this->shared_from_this()),
+                                    t,
+                                    tree_root);
+
+                        // Delete right brother
+                        this->storage_.delete_node(this->id_);
+
+                        return left_brother;
+                    }
+                }
+            }
+        }
+        return std::dynamic_pointer_cast<b_internal>(this->shared_from_this());
+    }
 };
 }
 
@@ -384,7 +472,7 @@ struct b_tree
             b_internal_ptr node_int = std::dynamic_pointer_cast<internal_t>(node);
             if (node_int->parent_ != nullptr)
             {
-                node_int = ensure_enough_keys(node_int);
+                node_int = node_int->ensure_enough_keys(t, root_);
                 nodes_.write_node(node_int->id_, node_int.get());
             }
 
@@ -472,90 +560,6 @@ private:
         }
 
         return out;
-    }
-
-    b_internal_ptr ensure_enough_keys(b_internal_ptr node)
-    {
-        if (node->parent_)
-        {
-            if (node->keys_.size() == t - 1)
-            {
-                b_internal_ptr parent = node->load_parent();
-
-                // Find parent link to it
-                auto it = std::find(parent->children_.begin(), parent->children_.end(), node->id_);
-                std::size_t i = it - parent->children_.begin();
-
-                // Check brothers
-                if (i + 1 <= parent->size())
-                {
-                    b_internal_ptr right_brother = std::dynamic_pointer_cast<internal_t>(nodes_.load_node(parent->children_[i + 1]));
-
-                    if (right_brother->keys_.size() >= t)
-                    {
-                        // Move left child from right brother to the node
-                        node->children_.push_back(std::move(right_brother->children_.front()));
-                        right_brother->children_.erase(right_brother->children_.begin());
-                        {
-                            b_node_ptr child = nodes_.load_node(node->children_.back());
-                            child->parent_ = node->id_;
-                            nodes_.write_node(child->id_, child.get());
-                        }
-
-                        // Update keys
-                        node->keys_.push_back(std::move(parent->keys_[i]));
-                        parent->keys_[i] = right_brother->keys_.front();
-                        right_brother->keys_.erase(right_brother->keys_.begin());
-
-                        nodes_.write_node(right_brother->id_, right_brother.get());
-                        nodes_.write_node(parent->id_, parent.get());
-                    }
-                    else
-                    {
-                        nodes_.write_node(parent->id_, parent.get());
-                        node->merge_with_right_brother(i, right_brother, t, root_);
-
-                        // Delete right brother
-                        nodes_.delete_node(right_brother->id_);
-                    }
-                }
-                else
-                {
-                    b_internal_ptr left_brother = std::dynamic_pointer_cast<internal_t>(nodes_.load_node(parent->children_[i - 1]));
-
-                    if (left_brother->keys_.size() >= t)
-                    {
-                        // Move right child from left brother to the node
-                        node->children_.insert(node->children_.begin(), std::move(left_brother->children_.back()));
-                        left_brother->children_.pop_back();
-                        {
-                            b_node_ptr child = nodes_.load_node(node->children_.front());
-                            child->parent_ = node->id_;
-                            nodes_.write_node(child->id_, child.get());
-                        }
-
-                        // Update keys
-                        node->keys_.insert(node->keys_.begin(), std::move(parent->keys_[i - 1]));
-                        parent->keys_[i - 1] = left_brother->keys_.back();
-                        left_brother->keys_.pop_back();
-
-                        nodes_.write_node(left_brother->id_, left_brother.get());
-                        nodes_.write_node(parent->id_, parent.get());
-                    }
-                    else
-                    {
-                        nodes_.write_node(parent->id_, parent.get());
-                        left_brother->merge_with_right_brother(i - 1, node, t, root_);
-
-                        // Delete right brother
-                        nodes_.delete_node(node->id_);
-
-                        node = left_brother;
-                    }
-                }
-            }
-        }
-        return node;
     }
 
     b_node_ptr load_root()
