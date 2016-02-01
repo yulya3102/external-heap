@@ -93,6 +93,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
     }
 
     virtual void add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
+    virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 };
 
 template <typename Key, typename Value>
@@ -225,6 +226,13 @@ struct b_leaf : b_node<Key, Value>
             tree_root = boost::none;
 
         return values_;
+    }
+
+    virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        auto result = this->remove(t, tree_root);
+        this->storage_.delete_node(this->id_);
+        return result;
     }
 };
 
@@ -482,6 +490,20 @@ struct b_internal : b_node<Key, Value>
         }
         return std::dynamic_pointer_cast<b_internal>(this->shared_from_this());
     }
+
+    virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        b_internal_ptr node = std::dynamic_pointer_cast<b_internal>(this->shared_from_this());
+
+        if (this->parent_)
+        {
+            node = this->ensure_enough_keys(t, tree_root);
+            this->storage_.write_node(node->id_, node.get());
+        }
+
+        return this->storage_.load_node(node->children_.front())
+            -> remove_left_leaf(t, tree_root);
+    }
 };
 }
 
@@ -502,24 +524,11 @@ struct b_tree
     {
         b_node_ptr node = load_root();
 
-        while (!is_leaf(node))
+        for (auto x : node->remove_left_leaf(t, root_))
         {
-            b_internal_ptr node_int = std::dynamic_pointer_cast<internal_t>(node);
-            if (node_int->parent_ != nullptr)
-            {
-                node_int = node_int->ensure_enough_keys(t, root_);
-                nodes_.write_node(node_int->id_, node_int.get());
-            }
-
-            node = nodes_.load_node(node_int->children_.front());
+            *out = std::move(x);
+            ++out;
         }
-
-        b_leaf_ptr leaf = std::dynamic_pointer_cast<leaf_t>(node);
-
-        out = remove_leaf(leaf, out);
-
-        // Delete leaf
-        nodes_.delete_node(leaf->id_);
 
         return out;
     }
@@ -549,19 +558,6 @@ private:
     {
         b_leaf_ptr leaf = std::dynamic_pointer_cast<leaf_t>(x);
         return leaf != nullptr;
-    }
-
-    template <typename OutIter>
-    OutIter remove_leaf(b_leaf_ptr leaf, OutIter out)
-    {
-        // Copy all elements from leaf to given output iterator
-        for (auto x : leaf->remove(t, root_))
-        {
-            *out = std::move(x);
-            ++out;
-        }
-
-        return out;
     }
 
     b_node_ptr load_root()
