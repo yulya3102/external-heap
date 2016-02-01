@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <memory>
 
 namespace storage
 {
@@ -13,8 +14,8 @@ struct memory
 
     memory(const memory<Node> & other)
     {
-        for (auto x : other.storage_)
-            storage_[x.first] = x.second->copy(*this);
+        for (auto & x : other.storage_)
+            storage_[x.first].reset(x.second->copy(*this));
     }
 
     node_id new_node() const
@@ -26,27 +27,19 @@ struct memory
     Node * load_node(const node_id & id) const
     {
         return storage_.at(id)->copy(*this);
-
     }
 
     void delete_node(const node_id & id)
     {
-        Node * deleted = storage_.at(id);
         storage_.erase(id);
-        delete deleted;
     }
 
     void write_node(const node_id & id, Node * node)
     {
-        auto old_it = storage_.find(id);
-        Node * old = nullptr;
-        if (old_it != storage_.end())
-            old = old_it->second;
-        storage_[id] = node->copy(*this);
-        delete old;
+        storage_[id].reset(node->copy(*this));
     }
 
 private:
-    std::unordered_map<node_id, Node *> storage_;
+    std::unordered_map<node_id, std::unique_ptr<Node>> storage_;
 };
 }
