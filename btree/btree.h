@@ -403,8 +403,9 @@ private:
                 nodes_.write_node(root->id_, root);
                 delete root;
             }
+            else
+                nodes_.write_node(parent->id_, parent);
 
-            nodes_.write_node(parent->id_, parent);
             delete parent;
         }
         else
