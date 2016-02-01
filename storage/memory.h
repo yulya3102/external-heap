@@ -30,7 +30,12 @@ struct memory
 
     void write_node(const node_id & id, Node * node)
     {
+        auto old_it = storage_.find(id);
+        Node * old = nullptr;
+        if (old_it != storage_.end())
+            old = old_it->second;
         storage_[id] = node->copy();
+        delete old;
     }
 
 private:
