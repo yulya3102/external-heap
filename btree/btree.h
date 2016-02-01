@@ -191,6 +191,41 @@ struct b_leaf : b_node<Key, Value>
             this->values_.insert(it, std::move(v));
         }
     }
+
+    std::vector<std::pair<Key, Value> > remove(std::size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        b_internal_ptr parent = this->load_parent();
+
+        if (parent)
+        {
+            assert(parent->keys_.size() >= t || !parent->parent_);
+
+            // Remove link to leaf from parent
+            auto it = std::find(parent->children_.begin(), parent->children_.end(), this->id_);
+            std::size_t i = it - parent->children_.begin();
+            parent->keys_.erase(parent->keys_.begin() + i);
+            parent->children_.erase(parent->children_.begin() + i);
+
+            // If parent became empty (that could only happen if it was root), make new root
+            if (parent->size() == 0)
+            {
+                assert(!parent->parent_);
+
+                tree_root = parent->children_.front();
+                this->storage_.delete_node(parent->id_);
+
+                b_node_ptr root = this->storage_.load_node(*tree_root);
+                root->parent_ = boost::none;
+                this->storage_.write_node(root->id_, root.get());
+            }
+            else
+                this->storage_.write_node(parent->id_, parent.get());
+        }
+        else
+            tree_root = boost::none;
+
+        return values_;
+    }
 };
 
 template <typename Key, typename Value>
@@ -519,41 +554,8 @@ private:
     template <typename OutIter>
     OutIter remove_leaf(b_leaf_ptr leaf, OutIter out)
     {
-        b_internal_ptr parent = leaf->load_parent();
-
-        if (parent)
-        {
-            assert(parent->keys_.size() >= t || !parent->parent_);
-
-            // Remove link to leaf from parent
-            auto it = std::find(parent->children_.begin(), parent->children_.end(), leaf->id_);
-            std::size_t i = it - parent->children_.begin();
-            parent->keys_.erase(parent->keys_.begin() + i);
-            parent->children_.erase(parent->children_.begin() + i);
-
-            // If parent became empty (that could only happen if it was root), make new root
-            if (parent->size() == 0)
-            {
-                assert(!parent->parent_);
-
-                root_ = parent->children_.front();
-
-                b_node_ptr root = load_root();
-                if (root->parent_)
-                {
-                    nodes_.delete_node(*root->parent_);
-                    root->parent_ = boost::none;
-                }
-                nodes_.write_node(root->id_, root.get());
-            }
-            else
-                nodes_.write_node(parent->id_, parent.get());
-        }
-        else
-            root_ = boost::none;
-
         // Copy all elements from leaf to given output iterator
-        for (auto x : leaf->values_)
+        for (auto x : leaf->remove(t, root_))
         {
             *out = std::move(x);
             ++out;
