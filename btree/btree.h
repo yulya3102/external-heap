@@ -154,6 +154,7 @@ struct b_leaf : b_node<Key, Value>
         this->update_parent(parent, brother, tree_root);
 
         this->storage_.write_node(brother->id_, brother);
+        delete brother;
 
         return parent;
     }
@@ -171,6 +172,7 @@ struct b_leaf : b_node<Key, Value>
             this->reload();
 
             this->storage_.write_node(next->id_, next);
+            delete next;
         }
         else
         {
@@ -245,6 +247,7 @@ struct b_internal : b_node<Key, Value>
             b_node_ptr child = this->storage_.load_node(brother->children_.back());
             child->parent_ = brother->id_;
             this->storage_.write_node(child->id_, child);
+            delete child;
         }
 
         this->keys_.erase(split_keys, this->keys_.end());
@@ -255,6 +258,7 @@ struct b_internal : b_node<Key, Value>
         this->update_parent(parent, brother, tree_root);
 
         this->storage_.write_node(brother->id_, brother);
+        delete brother;
 
         return parent;
     }
@@ -282,6 +286,7 @@ struct b_internal : b_node<Key, Value>
             this->reload();
 
             this->storage_.write_node(next->id_, next);
+            delete next;
         }
         else
         {
@@ -296,6 +301,7 @@ struct b_internal : b_node<Key, Value>
             this->reload();
 
             this->storage_.write_node(child->id_, child);
+            delete child;
         }
     }
 };
@@ -311,6 +317,7 @@ struct b_tree
         b_node_ptr root = load_root();
         root->add(std::move(key), std::move(value), t, root_);
         nodes_.write_node(root->id_, root);
+        delete root;
     }
 
     template <typename OutIter>
@@ -326,6 +333,7 @@ struct b_tree
 
             nodes_.write_node(node_int->id_, node_int);
             node = nodes_.load_node(node_int->children_.front());
+            delete node_int;
         }
 
         leaf_t * leaf = dynamic_cast<leaf_t *>(node);
@@ -345,7 +353,7 @@ struct b_tree
 
         b_node_ptr root = load_root();
         bool res = root->size() == 0;
-        //nodes_.write_node(root->id_, root);
+        delete root;
         return res;
     }
 
@@ -393,9 +401,11 @@ private:
                     root->parent_ = boost::none;
                 }
                 nodes_.write_node(root->id_, root);
+                delete root;
             }
 
             nodes_.write_node(parent->id_, parent);
+            delete parent;
         }
         else
             root_ = boost::none;
@@ -426,6 +436,7 @@ private:
             b_node_ptr child = nodes_.load_node(*child_it);
             child->parent_ = left_brother->id_;
             nodes_.write_node(child->id_, child);
+            delete child;
             left_brother->children_.push_back(std::move(*child_it));
         }
 
@@ -452,6 +463,7 @@ private:
         }
         else
             nodes_.write_node(parent->id_, parent);
+        delete parent;
 
         return left_brother;
     }
@@ -478,9 +490,12 @@ private:
                         // Move left child from right brother to the node
                         node->children_.push_back(std::move(right_brother->children_.front()));
                         right_brother->children_.erase(right_brother->children_.begin());
-                        b_node_ptr child = nodes_.load_node(node->children_.back());
-                        child->parent_ = node->id_;
-                        nodes_.write_node(child->id_, child);
+                        {
+                            b_node_ptr child = nodes_.load_node(node->children_.back());
+                            child->parent_ = node->id_;
+                            nodes_.write_node(child->id_, child);
+                            delete child;
+                        }
 
                         // Update keys
                         node->keys_.push_back(std::move(parent->keys_[i]));
@@ -488,6 +503,7 @@ private:
                         right_brother->keys_.erase(right_brother->keys_.begin());
 
                         nodes_.write_node(right_brother->id_, right_brother);
+                        delete right_brother;
                         nodes_.write_node(parent->id_, parent);
                     }
                     else
@@ -497,6 +513,7 @@ private:
 
                         // Delete right brother
                         nodes_.delete_node(right_brother->id_);
+                        delete right_brother;
                     }
                 }
                 else
@@ -508,9 +525,12 @@ private:
                         // Move right child from left brother to the node
                         node->children_.insert(node->children_.begin(), std::move(left_brother->children_.back()));
                         left_brother->children_.pop_back();
-                        b_node_ptr child = nodes_.load_node(node->children_.front());
-                        child->parent_ = node->id_;
-                        nodes_.write_node(child->id_, child);
+                        {
+                            b_node_ptr child = nodes_.load_node(node->children_.front());
+                            child->parent_ = node->id_;
+                            nodes_.write_node(child->id_, child);
+                            delete child;
+                        }
 
                         // Update keys
                         node->keys_.insert(node->keys_.begin(), std::move(parent->keys_[i - 1]));
@@ -518,6 +538,7 @@ private:
                         left_brother->keys_.pop_back();
 
                         nodes_.write_node(left_brother->id_, left_brother);
+                        delete left_brother;
                         nodes_.write_node(parent->id_, parent);
                     }
                     else
@@ -527,10 +548,12 @@ private:
 
                         // Delete right brother
                         nodes_.delete_node(node->id_);
+                        delete node;
 
                         node = left_brother;
                     }
                 }
+                delete parent;
             }
         }
         return node;
