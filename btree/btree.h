@@ -344,6 +344,7 @@ struct b_tree
 
         // Delete leaf
         nodes_.delete_node(leaf->id_);
+        delete leaf;
 
         return out;
     }
