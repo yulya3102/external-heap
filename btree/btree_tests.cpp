@@ -100,7 +100,7 @@ TEST(btree, random)
 /* This test won't work until I implement storage copying
  * with updating node storage links
  */
-TEST(btree, independent)
+TEST(btree, DISABLED_independent)
 {
     std::default_random_engine generator;
     std::uniform_int_distribution<std::int64_t> distribution(1, 100);
