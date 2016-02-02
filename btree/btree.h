@@ -31,6 +31,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
 
     virtual std::size_t size() const = 0;
     virtual b_node * copy(const storage::memory<b_node> & storage) const = 0;
+    virtual b_node_ptr new_brother() const = 0;
     virtual void reload() = 0;
 
     storage::memory<b_node> & storage_;
@@ -129,6 +130,11 @@ struct b_leaf : b_node<Key, Value>
         return new b_leaf(*this, const_cast<storage::memory<b_node<Key, Value> > &>(storage));
     }
 
+    virtual b_node_ptr new_brother() const
+    {
+        return b_node_ptr(new b_leaf(this->storage_));
+    }
+
     virtual void reload()
     {
         b_leaf_ptr updated_this = std::dynamic_pointer_cast<b_leaf>(this->storage_.load_node(this->id_));
@@ -149,7 +155,7 @@ struct b_leaf : b_node<Key, Value>
 
         if (!parent)
             parent = std::make_shared<b_buffer<Key, Value> >(this->storage_);
-        b_leaf_ptr brother = std::make_shared<b_leaf<Key, Value> >(this->storage_);
+        b_leaf_ptr brother = std::dynamic_pointer_cast<b_leaf>(this->new_brother());
 
         auto split_by_it = this->values_.begin();
         for (size_t i = 0; i < t - 1; ++i)
@@ -265,11 +271,6 @@ struct b_internal : b_node<Key, Value>
         return keys_.size();
     }
 
-    virtual b_internal * copy(const storage::memory<b_node<Key, Value> > & storage) const
-    {
-        return new b_internal(*this, const_cast<storage::memory<b_node<Key, Value> > &>(storage));
-    }
-
     virtual void reload()
     {
         b_internal_ptr updated_this = std::dynamic_pointer_cast<b_internal>(this->storage_.load_node(this->id_));
@@ -291,7 +292,7 @@ struct b_internal : b_node<Key, Value>
 
         if (!parent)
             parent = std::make_shared<b_buffer<Key, Value> >(this->storage_);
-        b_internal_ptr brother = std::make_shared<b_internal>(this->storage_);
+        b_internal_ptr brother = std::dynamic_pointer_cast<b_internal>(this->new_brother());
 
         auto split_keys = this->keys_.begin() + (t - 1);
         auto split_children = this->children_.begin() + t;
@@ -537,6 +538,11 @@ struct b_buffer : b_internal<Key, Value>
     virtual b_buffer * copy(const storage::memory<b_node<Key, Value> > & storage) const
     {
         return new b_buffer(*this, const_cast<storage::memory<b_node<Key, Value> > & >(storage));
+    }
+
+    virtual b_node_ptr new_brother() const
+    {
+        return b_node_ptr(new b_buffer(this->storage_));
     }
 
     virtual void reload()
