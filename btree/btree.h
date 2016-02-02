@@ -571,10 +571,10 @@ struct b_buffer : b_internal<Key, Value>
 
     virtual void add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
+        pending_add_.push(std::make_pair(std::move(key), std::move(value)));
+
         if (this->pending_add_.size() == t)
             this->flush(t, tree_root);
-
-        pending_add_.push(std::make_pair(std::move(key), std::move(value)));
     }
 
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
