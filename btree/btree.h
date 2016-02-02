@@ -530,11 +530,6 @@ struct b_buffer : b_internal<Key, Value>
         , pending_add_(other.pending_add_)
     {}
 
-    virtual std::size_t size() const
-    {
-        return pending_add_.size();
-    }
-
     virtual b_buffer * copy(const storage::memory<b_node<Key, Value> > & storage) const
     {
         return new b_buffer(*this, const_cast<storage::memory<b_node<Key, Value> > & >(storage));
@@ -576,7 +571,7 @@ struct b_buffer : b_internal<Key, Value>
 
     virtual void add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        if (this->size() == t)
+        if (this->pending_add_.size() == t)
             this->flush(t, tree_root);
 
         pending_add_.push(std::make_pair(std::move(key), std::move(value)));
