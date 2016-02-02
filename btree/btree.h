@@ -554,12 +554,9 @@ struct b_buffer : b_internal<Key, Value>
     {
         while (!pending_add_.empty())
         {
-            b_internal<Key, Value>::add(
-                        std::move(pending_add_.front().first),
-                        std::move(pending_add_.front().second),
-                        t,
-                        tree_root);
+            auto x = std::move(pending_add_.front());
             pending_add_.pop();
+            b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
         }
     }
 
