@@ -52,10 +52,10 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
 
     virtual ~b_node() = default;
 
-    b_internal_ptr load_parent() const
+    b_buffer_ptr load_parent() const
     {
         if (parent_)
-            return std::dynamic_pointer_cast<b_internal<Key, Value> >(storage_.load_node(*parent_));
+            return std::dynamic_pointer_cast<b_buffer<Key, Value> >(storage_.load_node(*parent_));
         return nullptr;
     }
 
@@ -108,6 +108,7 @@ struct b_leaf : b_node<Key, Value>
     using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
     using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
     using b_leaf_ptr = typename b_node<Key, Value>::b_leaf_ptr;
+    using b_buffer_ptr = typename b_node<Key, Value>::b_buffer_ptr;
 
     std::vector<std::pair<Key, Value> > values_;
 
@@ -149,7 +150,7 @@ struct b_leaf : b_node<Key, Value>
     {
         assert(this->size() == 2 * t - 1);
 
-        b_internal_ptr parent = this->load_parent();
+        b_buffer_ptr parent = this->load_parent();
 
         assert(!parent || parent->size() < 2 * t - 1);
 
@@ -206,7 +207,7 @@ struct b_leaf : b_node<Key, Value>
 
     std::vector<std::pair<Key, Value> > remove(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        b_internal_ptr parent = this->load_parent();
+        b_buffer_ptr parent = this->load_parent();
 
         if (parent)
         {
@@ -252,6 +253,7 @@ struct b_internal : b_node<Key, Value>
 {
     using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
     using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
+    using b_buffer_ptr = typename b_node<Key, Value>::b_buffer_ptr;
 
     std::vector<Key> keys_;
     std::vector<storage::node_id> children_;
@@ -286,7 +288,7 @@ struct b_internal : b_node<Key, Value>
     {
         assert(this->size() == 2 * t - 1);
 
-        b_internal_ptr parent = this->load_parent();
+        b_buffer_ptr parent = this->load_parent();
 
         assert(!parent || parent->size() < 2 * t - 1);
 
@@ -368,7 +370,7 @@ struct b_internal : b_node<Key, Value>
     void merge_with_right_brother(std::size_t i, b_internal_ptr right_brother, std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(this->parent_ == right_brother->parent_);
-        b_internal_ptr parent = this->load_parent();
+        b_buffer_ptr parent = this->load_parent();
 
         assert(parent->children_[i] == this->id_);
         assert(!parent->parent_ || parent->size() > t - 1);
@@ -415,7 +417,7 @@ struct b_internal : b_node<Key, Value>
         {
             if (this->keys_.size() == t - 1)
             {
-                b_internal_ptr parent = this->load_parent();
+                b_buffer_ptr parent = this->load_parent();
 
                 // Find parent link to it
                 auto it = std::find(parent->children_.begin(), parent->children_.end(), this->id_);
