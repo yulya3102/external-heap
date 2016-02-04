@@ -576,8 +576,12 @@ struct b_buffer : b_internal<Key, Value>
     virtual b_node_ptr split_full(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         b_buffer_ptr next = std::dynamic_pointer_cast<b_buffer>(b_internal<Key, Value>::split_full(t, tree_root));
-        assert(next->pending_add_.empty());
-        this->pending_add_.swap(next->pending_add_);
+
+        while (!this->pending_add_.empty())
+        {
+            next->pending_add_.push(std::move(this->pending_add_.front()));
+            pending_add_.pop();
+        }
 
         return next;
     }
