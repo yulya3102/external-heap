@@ -562,7 +562,7 @@ struct b_buffer : b_internal<Key, Value>
 
     b_node_ptr flush(size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        while (!pending_add_.empty())
+        if (!pending_add_.empty())
         {
             auto x = std::move(pending_add_.front());
             pending_add_.pop();
