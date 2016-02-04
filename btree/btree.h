@@ -193,7 +193,6 @@ struct b_leaf : b_node<Key, Value>
             this->storage_.write_node(x->id_, x.get());
 
             this->reload();
-
             return parent;
         }
         else
@@ -348,7 +347,6 @@ struct b_internal : b_node<Key, Value>
             this->storage_.write_node(x->id_, x.get());
 
             this->reload();
-
             return parent;
         }
         else
@@ -362,10 +360,9 @@ struct b_internal : b_node<Key, Value>
             auto x = child->add(std::move(key), std::move(value), t, tree_root);
 
             this->storage_.write_node(x->id_, x.get());
-            this->reload();
-
             this->storage_.write_node(child->id_, child.get());
 
+            this->reload();
             return this->shared_from_this();
         }
     }
@@ -565,8 +562,9 @@ struct b_buffer : b_internal<Key, Value>
             this->storage_.write_node(this->id_, this);
             b_node_ptr next = std::dynamic_pointer_cast<b_buffer>(next_flush)
                     -> flush(t, tree_root);
-            this->reload();
             this->storage_.write_node(next_flush->id_, next_flush.get());
+
+            this->reload();
             return next;
         }
 
@@ -593,8 +591,9 @@ struct b_buffer : b_internal<Key, Value>
             b_node_ptr next_add = this->flush(t, tree_root);
             this->storage_.write_node(this->id_, this);
             b_node_ptr next = next_add->add(std::move(key), std::move(value), t, tree_root);
-            this->reload();
             this->storage_.write_node(next_add->id_, next_add.get());
+
+            this->reload();
             return next;
         }
 
