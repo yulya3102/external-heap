@@ -566,8 +566,11 @@ struct b_buffer : b_internal<Key, Value>
         {
             auto x = std::move(pending_add_.front());
             pending_add_.pop();
-            b_node_ptr next = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
-            return std::dynamic_pointer_cast<b_buffer>(next)->flush(t, tree_root);
+            b_node_ptr next_flush = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
+            b_node_ptr next = std::dynamic_pointer_cast<b_buffer>(next_flush)
+                    -> flush(t, tree_root);
+            this->storage_.write_node(next_flush->id_, next_flush.get());
+            return next;
         }
 
         return this->shared_from_this();
