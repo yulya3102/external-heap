@@ -411,6 +411,30 @@ struct b_internal : b_node<Key, Value>
             this->storage_.write_node(parent->id_, parent.get());
     }
 
+    b_internal_ptr get_right_brother(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        assert(parent->pending_add_.empty());
+
+        auto it = std::find(parent->children_.begin(), parent->children_.end(), this->id_);
+        std::size_t i = it - parent->children_.begin();
+
+        if (i + 1 > parent->size())
+            return nullptr;
+
+        b_buffer_ptr right_brother = std::dynamic_pointer_cast<b_buffer<Key, Value> >(this->storage_.load_node(parent->children_[i + 1]));
+        if (right_brother->pending_add_.empty())
+            return right_brother;
+
+        this->storage_.write_node(parent->id_, parent.get());
+        this->storage_.write_node(this->id_, this);
+        auto x = right_brother->flush(t, tree_root);
+        this->storage_.write_node(x->id_, x.get());
+        parent->reload();
+        this->reload();
+
+        return this->get_right_brother(parent, t, tree_root);
+    }
+
     b_internal_ptr ensure_enough_keys(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (this->parent_)
@@ -426,7 +450,7 @@ struct b_internal : b_node<Key, Value>
                 // Check brothers
                 if (i + 1 <= parent->size())
                 {
-                    b_internal_ptr right_brother = std::dynamic_pointer_cast<b_internal>(this->storage_.load_node(parent->children_[i + 1]));
+                    b_internal_ptr right_brother = this->get_right_brother(parent, t, tree_root);
 
                     if (right_brother->keys_.size() >= t)
                     {
