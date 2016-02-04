@@ -592,8 +592,12 @@ struct b_buffer : b_internal<Key, Value>
     virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (this->pending_add_.size() == t)
-            return this->flush(t, tree_root)
-                    -> add(std::move(key), std::move(value), t, tree_root);
+        {
+            b_node_ptr next_add = this->flush(t, tree_root);
+            b_node_ptr next = next_add->add(std::move(key), std::move(value), t, tree_root);
+            this->storage_.write_node(next_add->id_, next_add.get());
+            return next;
+        }
 
         pending_add_.push(std::make_pair(std::move(key), std::move(value)));
         return this->shared_from_this();
