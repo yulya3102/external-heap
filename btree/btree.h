@@ -612,8 +612,9 @@ struct b_tree
     void add(Key key, Value value)
     {
         b_node_ptr root = load_root();
-        root->add(std::move(key), std::move(value), t, root_);
+        b_node_ptr next = root->add(std::move(key), std::move(value), t, root_);
         nodes_.write_node(root->id_, root.get());
+        nodes_.write_node(next->id_, next.get());
     }
 
     template <typename OutIter>
