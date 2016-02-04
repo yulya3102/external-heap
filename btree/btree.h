@@ -189,11 +189,10 @@ struct b_leaf : b_node<Key, Value>
 
             this->storage_.write_node(this->id_, this);
 
-            parent->add(std::move(key), std::move(value), t, tree_root);
+            b_node_ptr x = parent->add(std::move(key), std::move(value), t, tree_root);
+            this->storage_.write_node(x->id_, x.get());
 
             this->reload();
-
-            this->storage_.write_node(parent->id_, parent.get());
 
             return parent;
         }
@@ -345,11 +344,10 @@ struct b_internal : b_node<Key, Value>
             // but it can be not in storage yet, so I need to write it
             this->storage_.write_node(this->id_, this);
 
-            parent->add(std::move(key), std::move(value), t, tree_root);
+            auto x = parent->add(std::move(key), std::move(value), t, tree_root);
+            this->storage_.write_node(x->id_, x.get());
 
             this->reload();
-
-            this->storage_.write_node(parent->id_, parent.get());
 
             return parent;
         }
@@ -361,8 +359,9 @@ struct b_internal : b_node<Key, Value>
 
             this->storage_.write_node(this->id_, this);
 
-            child->add(std::move(key), std::move(value), t, tree_root);
+            auto x = child->add(std::move(key), std::move(value), t, tree_root);
 
+            this->storage_.write_node(x->id_, x.get());
             this->reload();
 
             this->storage_.write_node(child->id_, child.get());
@@ -563,8 +562,10 @@ struct b_buffer : b_internal<Key, Value>
             auto x = std::move(pending_add_.front());
             pending_add_.pop();
             b_node_ptr next_flush = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
+            this->storage_.write_node(this->id_, this);
             b_node_ptr next = std::dynamic_pointer_cast<b_buffer>(next_flush)
                     -> flush(t, tree_root);
+            this->reload();
             this->storage_.write_node(next_flush->id_, next_flush.get());
             return next;
         }
@@ -590,7 +591,9 @@ struct b_buffer : b_internal<Key, Value>
         if (this->pending_add_.size() == t)
         {
             b_node_ptr next_add = this->flush(t, tree_root);
+            this->storage_.write_node(this->id_, this);
             b_node_ptr next = next_add->add(std::move(key), std::move(value), t, tree_root);
+            this->reload();
             this->storage_.write_node(next_add->id_, next_add.get());
             return next;
         }
