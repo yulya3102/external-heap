@@ -98,7 +98,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
         new_brother->parent_ = parent->id_;
     }
 
-    virtual void add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
+    virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 };
 
@@ -183,7 +183,7 @@ struct b_leaf : b_node<Key, Value>
         return parent;
     }
 
-    virtual void add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (size() == 2 * t - 1)
         {
@@ -196,12 +196,16 @@ struct b_leaf : b_node<Key, Value>
             this->reload();
 
             this->storage_.write_node(next->id_, next.get());
+
+            return next;
         }
         else
         {
             auto v = std::make_pair(std::move(key), std::move(value));
             auto it = std::lower_bound(this->values_.begin(), this->values_.end(), v);
             this->values_.insert(it, std::move(v));
+
+            return this->shared_from_this();
         }
     }
 
@@ -327,7 +331,7 @@ struct b_internal : b_node<Key, Value>
         return parent;
     }
 
-    virtual void add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(std::is_sorted(keys_.begin(), keys_.end()));
 
@@ -350,6 +354,8 @@ struct b_internal : b_node<Key, Value>
             this->reload();
 
             this->storage_.write_node(next->id_, next.get());
+
+            return next;
         }
         else
         {
@@ -364,6 +370,8 @@ struct b_internal : b_node<Key, Value>
             this->reload();
 
             this->storage_.write_node(child->id_, child.get());
+
+            return this->shared_from_this();
         }
     }
 
@@ -552,14 +560,17 @@ struct b_buffer : b_internal<Key, Value>
         this->pending_add_ = updated_this->pending_add_;
     }
 
-    void flush(size_t t, boost::optional<storage::node_id> & tree_root)
+    b_node_ptr flush(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         while (!pending_add_.empty())
         {
             auto x = std::move(pending_add_.front());
             pending_add_.pop();
-            b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
+            b_node_ptr next = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
+            return std::dynamic_pointer_cast<b_buffer>(next)->flush(t, tree_root);
         }
+
+        return this->shared_from_this();
     }
 
     virtual b_node_ptr split_full(size_t t, boost::optional<storage::node_id> & tree_root)
@@ -571,12 +582,14 @@ struct b_buffer : b_internal<Key, Value>
         return next;
     }
 
-    virtual void add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         pending_add_.push(std::make_pair(std::move(key), std::move(value)));
 
         if (this->pending_add_.size() == t)
-            this->flush(t, tree_root);
+            return this->flush(t, tree_root);
+
+        return this->shared_from_this();
     }
 
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
