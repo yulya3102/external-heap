@@ -605,8 +605,11 @@ struct b_buffer : b_internal<Key, Value>
 
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        this->flush(t, tree_root);
-        return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
+        if (this->pending_add_.empty())
+            return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
+
+        b_node_ptr next = this->flush(t, tree_root);
+        return next->remove_left_leaf(t, tree_root);
     }
 };
 }
