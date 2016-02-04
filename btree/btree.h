@@ -194,8 +194,8 @@ struct b_leaf : b_node<Key, Value>
 
             this->write();
 
-            b_node_ptr x = parent->add(std::move(key), std::move(value), t, tree_root);
-            x->write();
+            parent->add(std::move(key), std::move(value), t, tree_root)
+                    -> write();
 
             this->reload();
             return parent;
@@ -348,8 +348,8 @@ struct b_internal : b_node<Key, Value>
             // but it can be not in storage yet, so I need to write it
             this->write();
 
-            auto x = parent->add(std::move(key), std::move(value), t, tree_root);
-            x->write();
+            parent->add(std::move(key), std::move(value), t, tree_root)
+                    -> write();
 
             this->reload();
             return parent;
@@ -362,9 +362,9 @@ struct b_internal : b_node<Key, Value>
 
             this->write();
 
-            auto x = child->add(std::move(key), std::move(value), t, tree_root);
+            child->add(std::move(key), std::move(value), t, tree_root)
+                    -> write();
 
-            x->write();
             child->write();
 
             this->reload();
@@ -432,8 +432,8 @@ struct b_internal : b_node<Key, Value>
 
         parent->write();
         this->write();
-        auto x = right_brother->flush(t, tree_root);
-        x->write();
+        right_brother->flush(t, tree_root)
+                -> write();
         parent->reload();
         this->reload();
 
