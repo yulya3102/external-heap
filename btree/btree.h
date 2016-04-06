@@ -8,7 +8,7 @@
 
 #include <boost/optional.hpp>
 
-#include "../storage/memory.h"
+#include <storage/cache.h>
 
 namespace detail
 {
@@ -34,17 +34,17 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
     virtual b_node_ptr new_brother() const = 0;
     virtual void reload() = 0;
 
-    storage::memory<b_node> & storage_;
+    storage::cache<b_node> & storage_;
     storage::node_id id_;
     boost::optional<storage::node_id> parent_;
 
-    b_node(storage::memory<b_node> & storage)
+    b_node(storage::cache<b_node> & storage)
         : storage_(storage)
         , id_(storage.new_node())
         , parent_(boost::none)
     {}
 
-    b_node(const b_node & other, storage::memory<b_node> & storage)
+    b_node(const b_node & other, storage::cache<b_node> & storage)
         : storage_(storage)
         , id_(other.id_)
         , parent_(other.parent_)
@@ -117,11 +117,11 @@ struct b_leaf : b_node<Key, Value>
 
     std::vector<std::pair<Key, Value> > values_;
 
-    b_leaf(storage::memory<b_node<Key, Value> > & storage)
+    b_leaf(storage::cache<b_node<Key, Value> > & storage)
         : b_node<Key, Value>(storage)
     {}
 
-    b_leaf(const b_leaf & other, storage::memory<b_node<Key, Value> > & storage)
+    b_leaf(const b_leaf & other, storage::cache<b_node<Key, Value> > & storage)
         : b_node<Key, Value>(other, storage)
         , values_(other.values_)
     {}
@@ -133,7 +133,8 @@ struct b_leaf : b_node<Key, Value>
 
     virtual b_leaf * copy(const storage::memory<b_node<Key, Value> > & storage) const
     {
-        return new b_leaf(*this, const_cast<storage::memory<b_node<Key, Value> > &>(storage));
+        auto cache = new storage::cache<b_node<Key, Value>>(const_cast<storage::memory<b_node<Key, Value> > & >(storage));
+        return new b_leaf(*this, *cache);
     }
 
     virtual b_node_ptr new_brother() const
@@ -263,11 +264,11 @@ struct b_internal : b_node<Key, Value>
     std::vector<Key> keys_;
     std::vector<storage::node_id> children_;
 
-    b_internal(storage::memory<b_node<Key, Value> > & storage)
+    b_internal(storage::cache<b_node<Key, Value> > & storage)
         : b_node<Key, Value>(storage)
     {}
 
-    b_internal(const b_internal & other, storage::memory<b_node<Key, Value> > & storage)
+    b_internal(const b_internal & other, storage::cache<b_node<Key, Value> > & storage)
         : b_node<Key, Value>(other, storage)
         , keys_(other.keys_)
         , children_(other.children_)
@@ -552,18 +553,19 @@ struct b_buffer : b_internal<Key, Value>
 
     std::queue<std::pair<Key, Value> > pending_add_;
 
-    b_buffer(storage::memory<b_node<Key, Value> > & storage)
+    b_buffer(storage::cache<b_node<Key, Value> > & storage)
         : b_internal<Key, Value>(storage)
     {}
 
-    b_buffer(const b_buffer & other, storage::memory<b_node<Key, Value> > & storage)
+    b_buffer(const b_buffer & other, storage::cache<b_node<Key, Value> > & storage)
         : b_internal<Key, Value>(other)
         , pending_add_(other.pending_add_)
     {}
 
     virtual b_buffer * copy(const storage::memory<b_node<Key, Value> > & storage) const
     {
-        return new b_buffer(*this, const_cast<storage::memory<b_node<Key, Value> > & >(storage));
+        auto cache = new storage::cache<b_node<Key, Value>>(const_cast<storage::memory<b_node<Key, Value> > & >(storage));
+        return new b_buffer(*this, *cache);
     }
 
     virtual b_node_ptr new_brother() const
@@ -646,6 +648,10 @@ namespace bptree
 template <typename Key, typename Value, int t>
 struct b_tree
 {
+    b_tree()
+        : nodes_(storage_)
+    {}
+
     void add(Key key, Value value)
     {
         b_node_ptr root = load_root();
@@ -685,7 +691,8 @@ private:
     using b_buffer_ptr = typename detail::b_node<Key, Value>::b_buffer_ptr;
 
     boost::optional<storage::node_id> root_;
-    storage::memory<detail::b_node<Key, Value> > nodes_;
+    storage::memory<detail::b_node<Key, Value> > storage_;
+    storage::cache<detail::b_node<Key, Value> > nodes_;
 
     using leaf_t = detail::b_leaf<Key, Value>;
     using internal_t = detail::b_internal<Key, Value>;
