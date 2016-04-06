@@ -32,15 +32,14 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
     virtual std::size_t size() const = 0;
     virtual b_node * copy(const storage::memory<b_node> & storage) const = 0;
     virtual b_node_ptr new_brother() const = 0;
-    virtual void reload() = 0;
 
     storage::cache<b_node> & storage_;
     storage::node_id id_;
     boost::optional<storage::node_id> parent_;
 
-    b_node(storage::cache<b_node> & storage)
+    b_node(storage::cache<b_node> & storage, const storage::node_id & id)
         : storage_(storage)
-        , id_(storage.new_node())
+        , id_(id)
         , parent_(boost::none)
     {}
 
@@ -55,7 +54,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
     b_buffer_ptr load_parent() const
     {
         if (parent_)
-            return std::dynamic_pointer_cast<b_buffer<Key, Value> >(storage_.load_node(*parent_));
+            return std::dynamic_pointer_cast<b_buffer<Key, Value> >(storage_[*parent_]);
         return nullptr;
     }
 
@@ -98,11 +97,6 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
         new_brother->parent_ = parent->id_;
     }
 
-    void write()
-    {
-        this->storage_.write_node(this->id_, this);
-    }
-
     virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 };
@@ -117,8 +111,8 @@ struct b_leaf : b_node<Key, Value>
 
     std::vector<std::pair<Key, Value> > values_;
 
-    b_leaf(storage::cache<b_node<Key, Value> > & storage)
-        : b_node<Key, Value>(storage)
+    b_leaf(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id)
+        : b_node<Key, Value>(storage, id)
     {}
 
     b_leaf(const b_leaf & other, storage::cache<b_node<Key, Value> > & storage)
@@ -139,15 +133,7 @@ struct b_leaf : b_node<Key, Value>
 
     virtual b_node_ptr new_brother() const
     {
-        return b_node_ptr(new b_leaf(this->storage_));
-    }
-
-    virtual void reload()
-    {
-        b_leaf_ptr updated_this = std::dynamic_pointer_cast<b_leaf>(this->storage_.load_node(this->id_));
-        this->values_ = updated_this->values_;
-        this->id_ = updated_this->id_;
-        this->parent_ = updated_this->parent_;
+        return this->storage_.new_node([this] (storage::node_id id) { return new b_leaf(this->storage_, id); });
     }
 
     virtual ~b_leaf() = default;
@@ -158,7 +144,7 @@ struct b_leaf : b_node<Key, Value>
         assert(!parent || parent->size() < 2 * t - 1);
 
         if (!parent)
-            parent = std::make_shared<b_buffer<Key, Value> >(this->storage_);
+            parent = b_buffer<Key, Value>::new_node(this->storage_);
         b_leaf_ptr brother = std::dynamic_pointer_cast<b_leaf>(this->new_brother());
 
         auto split_by_it = this->values_.begin();
@@ -181,8 +167,6 @@ struct b_leaf : b_node<Key, Value>
         // and update all parent links
         this->update_parent(parent, brother, tree_root);
 
-        brother->write();
-
         return parent;
     }
 
@@ -193,12 +177,8 @@ struct b_leaf : b_node<Key, Value>
             b_buffer_ptr parent = this->load_parent();
             parent = this->split_full(parent, t, tree_root);
 
-            this->write();
+            parent->add(std::move(key), std::move(value), t, tree_root);
 
-            parent->add(std::move(key), std::move(value), t, tree_root)
-                    -> write();
-
-            this->reload();
             return parent;
         }
         else
@@ -233,12 +213,9 @@ struct b_leaf : b_node<Key, Value>
                 tree_root = parent->children_.front();
                 this->storage_.delete_node(parent->id_);
 
-                b_node_ptr root = this->storage_.load_node(*tree_root);
+                b_node_ptr root = this->storage_[*tree_root];
                 root->parent_ = boost::none;
-                root->write();
             }
-            else
-                parent->write();
         }
         else
             tree_root = boost::none;
@@ -264,8 +241,8 @@ struct b_internal : b_node<Key, Value>
     std::vector<Key> keys_;
     std::vector<storage::node_id> children_;
 
-    b_internal(storage::cache<b_node<Key, Value> > & storage)
-        : b_node<Key, Value>(storage)
+    b_internal(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id)
+        : b_node<Key, Value>(storage, id)
     {}
 
     b_internal(const b_internal & other, storage::cache<b_node<Key, Value> > & storage)
@@ -279,15 +256,6 @@ struct b_internal : b_node<Key, Value>
         return keys_.size();
     }
 
-    virtual void reload()
-    {
-        b_internal_ptr updated_this = std::dynamic_pointer_cast<b_internal>(this->storage_.load_node(this->id_));
-        this->children_ = updated_this->children_;
-        this->keys_ = updated_this->keys_;
-        this->id_ = updated_this->id_;
-        this->parent_ = updated_this->parent_;
-    }
-
     virtual ~b_internal() = default;
 
     virtual b_buffer_ptr split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
@@ -296,7 +264,7 @@ struct b_internal : b_node<Key, Value>
         assert(!parent || parent->size() < 2 * t - 1);
 
         if (!parent)
-            parent = std::make_shared<b_buffer<Key, Value> >(this->storage_);
+            parent = b_buffer<Key, Value>::new_node(this->storage_);
         b_internal_ptr brother = std::dynamic_pointer_cast<b_internal>(this->new_brother());
 
         auto split_keys = this->keys_.begin() + (t - 1);
@@ -313,9 +281,8 @@ struct b_internal : b_node<Key, Value>
         for (auto it_children = split_children; it_children != this->children_.end(); ++it_children)
         {
             brother->children_.push_back(std::move(*it_children));
-            b_node_ptr child = this->storage_.load_node(brother->children_.back());
+            b_node_ptr child = this->storage_[brother->children_.back()];
             child->parent_ = brother->id_;
-            child->write();
         }
 
         this->keys_.erase(split_keys, this->keys_.end());
@@ -324,8 +291,6 @@ struct b_internal : b_node<Key, Value>
         // Make correct links from parent to the node and its new brother
         // and update all parent links
         this->update_parent(parent, brother, tree_root);
-
-        brother->write();
 
         return parent;
     }
@@ -344,31 +309,19 @@ struct b_internal : b_node<Key, Value>
              * except function parameters and return value
              * is outdated and should be reloaded from storage
              */
-            // 'this' will be outdated after next->add
-            // so I'll need to reload it
-            // but it can be not in storage yet, so I need to write it
-            this->write();
 
-            parent->add(std::move(key), std::move(value), t, tree_root)
-                    -> write();
+            parent->add(std::move(key), std::move(value), t, tree_root);
 
-            this->reload();
             return parent;
         }
         else
         {
             auto it = std::lower_bound(keys_.begin(), keys_.end(), key);
             std::size_t i = it - keys_.begin();
-            b_node_ptr child = this->storage_.load_node(children_[i]);
+            b_node_ptr child = this->storage_[children_[i]];
 
-            this->write();
+            child->add(std::move(key), std::move(value), t, tree_root);
 
-            child->add(std::move(key), std::move(value), t, tree_root)
-                    -> write();
-
-            child->write();
-
-            this->reload();
             return this->shared_from_this();
         }
     }
@@ -386,9 +339,8 @@ struct b_internal : b_node<Key, Value>
              child_it != right_brother->children_.end();
              ++child_it)
         {
-            b_node_ptr child = this->storage_.load_node(*child_it);
+            b_node_ptr child = this->storage_[*child_it];
             child->parent_ = this->id_;
-            child->write();
             this->children_.push_back(std::move(*child_it));
         }
 
@@ -413,8 +365,6 @@ struct b_internal : b_node<Key, Value>
             this->storage_.delete_node(parent->id_);
             this->parent_ = boost::none;
         }
-        else
-            parent->write();
     }
 
     b_internal_ptr get_right_brother(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
@@ -427,16 +377,11 @@ struct b_internal : b_node<Key, Value>
         if (i + 1 > parent->size())
             return nullptr;
 
-        b_buffer_ptr right_brother = std::dynamic_pointer_cast<b_buffer<Key, Value> >(this->storage_.load_node(parent->children_[i + 1]));
+        b_buffer_ptr right_brother = std::dynamic_pointer_cast<b_buffer<Key, Value> >(this->storage_[parent->children_[i + 1]]);
         if (right_brother->pending_add_.empty())
             return right_brother;
 
-        parent->write();
-        this->write();
-        right_brother->flush(t, tree_root)
-                -> write();
-        parent->reload();
-        this->reload();
+        right_brother->flush(t, tree_root);
 
         return this->get_right_brother(parent, t, tree_root);
     }
@@ -464,22 +409,17 @@ struct b_internal : b_node<Key, Value>
                         this->children_.push_back(std::move(right_brother->children_.front()));
                         right_brother->children_.erase(right_brother->children_.begin());
                         {
-                            b_node_ptr child = this->storage_.load_node(this->children_.back());
+                            b_node_ptr child = this->storage_[this->children_.back()];
                             child->parent_ = this->id_;
-                            child->write();
                         }
 
                         // Update keys
                         this->keys_.push_back(std::move(parent->keys_[i]));
                         parent->keys_[i] = right_brother->keys_.front();
                         right_brother->keys_.erase(right_brother->keys_.begin());
-
-                        right_brother->write();
-                        parent->write();
                     }
                     else
                     {
-                        parent->write();
                         this->merge_with_right_brother(i, right_brother, t, tree_root);
 
                         // Delete right brother
@@ -488,7 +428,7 @@ struct b_internal : b_node<Key, Value>
                 }
                 else
                 {
-                    b_internal_ptr left_brother = std::dynamic_pointer_cast<b_internal>(this->storage_.load_node(parent->children_[i - 1]));
+                    b_internal_ptr left_brother = std::dynamic_pointer_cast<b_internal>(this->storage_[parent->children_[i - 1]]);
 
                     if (left_brother->keys_.size() >= t)
                     {
@@ -496,22 +436,17 @@ struct b_internal : b_node<Key, Value>
                         this->children_.insert(this->children_.begin(), std::move(left_brother->children_.back()));
                         left_brother->children_.pop_back();
                         {
-                            b_node_ptr child = this->storage_.load_node(this->children_.front());
+                            b_node_ptr child = this->storage_[this->children_.front()];
                             child->parent_ = this->id_;
-                            child->write();
                         }
 
                         // Update keys
                         this->keys_.insert(this->keys_.begin(), std::move(parent->keys_[i - 1]));
                         parent->keys_[i - 1] = left_brother->keys_.back();
                         left_brother->keys_.pop_back();
-
-                        left_brother->write();
-                        parent->write();
                     }
                     else
                     {
-                        parent->write();
                         left_brother->merge_with_right_brother(
                                     i - 1,
                                     std::dynamic_pointer_cast<b_internal>(this->shared_from_this()),
@@ -534,12 +469,9 @@ struct b_internal : b_node<Key, Value>
         b_internal_ptr node = std::dynamic_pointer_cast<b_internal>(this->shared_from_this());
 
         if (this->parent_)
-        {
             node = this->ensure_enough_keys(t, tree_root);
-            node->write();
-        }
 
-        return this->storage_.load_node(node->children_.front())
+        return this->storage_[node->children_.front()]
             -> remove_left_leaf(t, tree_root);
     }
 };
@@ -553,8 +485,8 @@ struct b_buffer : b_internal<Key, Value>
 
     std::queue<std::pair<Key, Value> > pending_add_;
 
-    b_buffer(storage::cache<b_node<Key, Value> > & storage)
-        : b_internal<Key, Value>(storage)
+    b_buffer(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id)
+        : b_internal<Key, Value>(storage, id)
     {}
 
     b_buffer(const b_buffer & other, storage::cache<b_node<Key, Value> > & storage)
@@ -568,19 +500,14 @@ struct b_buffer : b_internal<Key, Value>
         return new b_buffer(*this, *cache);
     }
 
-    virtual b_node_ptr new_brother() const
+    static b_buffer_ptr new_node(storage::cache<b_node<Key, Value>> & cache)
     {
-        return b_node_ptr(new b_buffer(this->storage_));
+        return std::dynamic_pointer_cast<b_buffer>(cache.new_node([&cache] (storage::node_id id) { return new b_buffer(cache, id); }));
     }
 
-    virtual void reload()
+    virtual b_node_ptr new_brother() const
     {
-        b_buffer_ptr updated_this = std::dynamic_pointer_cast<b_buffer>(this->storage_.load_node(this->id_));
-        this->children_ = updated_this->children_;
-        this->keys_ = updated_this->keys_;
-        this->id_ = updated_this->id_;
-        this->parent_ = updated_this->parent_;
-        this->pending_add_ = updated_this->pending_add_;
+        return new_node(this->storage_);
     }
 
     b_node_ptr flush(size_t t, boost::optional<storage::node_id> & tree_root)
@@ -590,12 +517,9 @@ struct b_buffer : b_internal<Key, Value>
             auto x = std::move(pending_add_.front());
             pending_add_.pop();
             b_node_ptr next_flush = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
-            this->write();
             b_node_ptr next = std::dynamic_pointer_cast<b_buffer>(next_flush)
                     -> flush(t, tree_root);
-            next_flush->write();
 
-            this->reload();
             return next;
         }
 
@@ -620,11 +544,8 @@ struct b_buffer : b_internal<Key, Value>
         if (this->pending_add_.size() == t)
         {
             b_node_ptr next_add = this->flush(t, tree_root);
-            this->write();
             b_node_ptr next = next_add->add(std::move(key), std::move(value), t, tree_root);
-            next_add->write();
 
-            this->reload();
             return next;
         }
 
@@ -655,9 +576,7 @@ struct b_tree
     void add(Key key, Value value)
     {
         b_node_ptr root = load_root();
-        b_node_ptr next = root->add(std::move(key), std::move(value), t, root_);
-        nodes_.write_node(root->id_, root.get());
-        nodes_.write_node(next->id_, next.get());
+        root->add(std::move(key), std::move(value), t, root_);
     }
 
     template <typename OutIter>
@@ -707,12 +626,12 @@ private:
     {
         if (!root_)
         {
-            b_leaf_ptr root = std::make_shared<leaf_t>(nodes_);
+            b_node_ptr root = nodes_.new_node([this] (storage::node_id id) { return new leaf_t(this->nodes_, id); });
             root_ = root->id_;
             return root;
         }
 
-        return nodes_.load_node(*root_);
+        return nodes_[*root_];
     }
 };
 }
