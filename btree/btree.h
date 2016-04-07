@@ -97,7 +97,9 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
         new_brother->parent_ = parent->id_;
     }
 
+    // Add pair(key, value) to the subtree and return root of changed subtree
     virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
+
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 };
 
@@ -177,9 +179,7 @@ struct b_leaf : b_node<Key, Value>
             b_buffer_ptr parent = this->load_parent();
             parent = this->split_full(parent, t, tree_root);
 
-            parent->add(std::move(key), std::move(value), t, tree_root);
-
-            return parent;
+            return parent->add(std::move(key), std::move(value), t, tree_root);
         }
         else
         {
@@ -304,15 +304,7 @@ struct b_internal : b_node<Key, Value>
             b_buffer_ptr parent = this->load_parent();
             parent = this->split_full(parent, t, tree_root);
 
-            /*
-             * Outdated nodes: after function call, every node
-             * except function parameters and return value
-             * is outdated and should be reloaded from storage
-             */
-
-            parent->add(std::move(key), std::move(value), t, tree_root);
-
-            return parent;
+            return parent->add(std::move(key), std::move(value), t, tree_root);
         }
         else
         {
@@ -320,9 +312,11 @@ struct b_internal : b_node<Key, Value>
             std::size_t i = it - keys_.begin();
             b_node_ptr child = this->storage_[children_[i]];
 
-            child->add(std::move(key), std::move(value), t, tree_root);
+            b_node_ptr changed_subtree = child->add(std::move(key), std::move(value), t, tree_root);
+            if (changed_subtree->id_ == child->id_)
+                return this->shared_from_this();
 
-            return this->shared_from_this();
+            return changed_subtree;
         }
     }
 
@@ -544,9 +538,12 @@ struct b_buffer : b_internal<Key, Value>
         if (this->pending_add_.size() == t)
         {
             b_node_ptr next_add = this->flush(t, tree_root);
-            b_node_ptr next = next_add->add(std::move(key), std::move(value), t, tree_root);
+            b_node_ptr changed_subtree = next_add->add(std::move(key), std::move(value), t, tree_root);
 
-            return next;
+            if (changed_subtree->id_ == next_add->id_)
+                return this->shared_from_this();
+
+            return changed_subtree;
         }
 
         pending_add_.push(std::make_pair(std::move(key), std::move(value)));
