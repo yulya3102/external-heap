@@ -100,6 +100,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
     // Add pair(key, value) to the subtree and return root of changed subtree
     virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 
+    // Remove left leaf from subtree and return values from it
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 };
 
@@ -191,6 +192,7 @@ struct b_leaf : b_node<Key, Value>
         }
     }
 
+    // Remove this leaf from parent tree and return values from it
     std::vector<std::pair<Key, Value> > remove(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
         b_buffer_ptr parent = this->load_parent();
@@ -380,6 +382,9 @@ struct b_internal : b_node<Key, Value>
         return this->get_right_brother(parent, t, tree_root);
     }
 
+    // Ensure this node has enough keys (and children) to safely delete one
+    // If it's not, steal one child from any brother or merge with brother
+    // Return node with desired amount of keys
     b_internal_ptr ensure_enough_keys(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (!this->parent_ || this->keys_.size() != t - 1)
@@ -387,7 +392,7 @@ struct b_internal : b_node<Key, Value>
 
         b_buffer_ptr parent = this->load_parent();
 
-        // Find parent link to it
+        // Find parent link to this node
         auto it = std::find(parent->children_.begin(), parent->children_.end(), this->id_);
         std::size_t i = it - parent->children_.begin();
 
@@ -502,17 +507,16 @@ struct b_buffer : b_internal<Key, Value>
         return new_node(this->storage_);
     }
 
+    // Flush the subtree
+    // Return root of flushed subtree
     b_node_ptr flush(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (!pending_add_.empty())
         {
             auto x = std::move(pending_add_.front());
             pending_add_.pop();
-            b_node_ptr next_flush = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
-            b_node_ptr next = std::dynamic_pointer_cast<b_buffer>(next_flush)
-                    -> flush(t, tree_root);
-
-            return next;
+            b_node_ptr changed_subtree = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
+            return std::dynamic_pointer_cast<b_buffer>(changed_subtree)->flush(t, tree_root);
         }
 
         return this->shared_from_this();
