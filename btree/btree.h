@@ -382,79 +382,77 @@ struct b_internal : b_node<Key, Value>
 
     b_internal_ptr ensure_enough_keys(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        if (this->parent_)
+        if (!this->parent_ || this->keys_.size() != t - 1)
+            return std::dynamic_pointer_cast<b_internal>(this->shared_from_this());
+
+        b_buffer_ptr parent = this->load_parent();
+
+        // Find parent link to it
+        auto it = std::find(parent->children_.begin(), parent->children_.end(), this->id_);
+        std::size_t i = it - parent->children_.begin();
+
+        // Check brothers
+        if (i + 1 <= parent->size())
         {
-            if (this->keys_.size() == t - 1)
+            b_internal_ptr right_brother = this->get_right_brother(parent, t, tree_root);
+
+            if (right_brother->keys_.size() >= t)
             {
-                b_buffer_ptr parent = this->load_parent();
-
-                // Find parent link to it
-                auto it = std::find(parent->children_.begin(), parent->children_.end(), this->id_);
-                std::size_t i = it - parent->children_.begin();
-
-                // Check brothers
-                if (i + 1 <= parent->size())
+                // Move left child from right brother to the node
+                this->children_.push_back(std::move(right_brother->children_.front()));
+                right_brother->children_.erase(right_brother->children_.begin());
                 {
-                    b_internal_ptr right_brother = this->get_right_brother(parent, t, tree_root);
-
-                    if (right_brother->keys_.size() >= t)
-                    {
-                        // Move left child from right brother to the node
-                        this->children_.push_back(std::move(right_brother->children_.front()));
-                        right_brother->children_.erase(right_brother->children_.begin());
-                        {
-                            b_node_ptr child = this->storage_[this->children_.back()];
-                            child->parent_ = this->id_;
-                        }
-
-                        // Update keys
-                        this->keys_.push_back(std::move(parent->keys_[i]));
-                        parent->keys_[i] = right_brother->keys_.front();
-                        right_brother->keys_.erase(right_brother->keys_.begin());
-                    }
-                    else
-                    {
-                        this->merge_with_right_brother(i, right_brother, t, tree_root);
-
-                        // Delete right brother
-                        this->storage_.delete_node(right_brother->id_);
-                    }
+                    b_node_ptr child = this->storage_[this->children_.back()];
+                    child->parent_ = this->id_;
                 }
-                else
-                {
-                    b_internal_ptr left_brother = std::dynamic_pointer_cast<b_internal>(this->storage_[parent->children_[i - 1]]);
 
-                    if (left_brother->keys_.size() >= t)
-                    {
-                        // Move right child from left brother to the node
-                        this->children_.insert(this->children_.begin(), std::move(left_brother->children_.back()));
-                        left_brother->children_.pop_back();
-                        {
-                            b_node_ptr child = this->storage_[this->children_.front()];
-                            child->parent_ = this->id_;
-                        }
+                // Update keys
+                this->keys_.push_back(std::move(parent->keys_[i]));
+                parent->keys_[i] = right_brother->keys_.front();
+                right_brother->keys_.erase(right_brother->keys_.begin());
+            }
+            else
+            {
+                this->merge_with_right_brother(i, right_brother, t, tree_root);
 
-                        // Update keys
-                        this->keys_.insert(this->keys_.begin(), std::move(parent->keys_[i - 1]));
-                        parent->keys_[i - 1] = left_brother->keys_.back();
-                        left_brother->keys_.pop_back();
-                    }
-                    else
-                    {
-                        left_brother->merge_with_right_brother(
-                                    i - 1,
-                                    std::dynamic_pointer_cast<b_internal>(this->shared_from_this()),
-                                    t,
-                                    tree_root);
-
-                        // Delete right brother
-                        this->storage_.delete_node(this->id_);
-
-                        return left_brother;
-                    }
-                }
+                // Delete right brother
+                this->storage_.delete_node(right_brother->id_);
             }
         }
+        else
+        {
+            b_internal_ptr left_brother = std::dynamic_pointer_cast<b_internal>(this->storage_[parent->children_[i - 1]]);
+
+            if (left_brother->keys_.size() >= t)
+            {
+                // Move right child from left brother to the node
+                this->children_.insert(this->children_.begin(), std::move(left_brother->children_.back()));
+                left_brother->children_.pop_back();
+                {
+                    b_node_ptr child = this->storage_[this->children_.front()];
+                    child->parent_ = this->id_;
+                }
+
+                // Update keys
+                this->keys_.insert(this->keys_.begin(), std::move(parent->keys_[i - 1]));
+                parent->keys_[i - 1] = left_brother->keys_.back();
+                left_brother->keys_.pop_back();
+            }
+            else
+            {
+                left_brother->merge_with_right_brother(
+                            i - 1,
+                            std::dynamic_pointer_cast<b_internal>(this->shared_from_this()),
+                            t,
+                            tree_root);
+
+                // Delete right brother
+                this->storage_.delete_node(this->id_);
+
+                return left_brother;
+            }
+        }
+
         return std::dynamic_pointer_cast<b_internal>(this->shared_from_this());
     }
 
