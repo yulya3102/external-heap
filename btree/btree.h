@@ -12,6 +12,12 @@
 
 namespace detail
 {
+enum struct result_tag
+{
+    RESULT,
+    CONTINUE_FROM
+};
+
 template <typename Key, typename Value>
 struct b_internal;
 
@@ -363,7 +369,7 @@ struct b_internal : b_node<Key, Value>
         }
     }
 
-    b_internal_ptr get_right_brother(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
+    std::pair<result_tag, b_internal_ptr> get_right_brother(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(parent->pending_add_.empty());
 
@@ -371,24 +377,27 @@ struct b_internal : b_node<Key, Value>
         std::size_t i = it - parent->children_.begin();
 
         if (i + 1 > parent->size())
-            return nullptr;
+            return {result_tag::RESULT, nullptr};
 
         b_buffer_ptr right_brother = std::dynamic_pointer_cast<b_buffer<Key, Value> >(this->storage_[parent->children_[i + 1]]);
         if (right_brother->pending_add_.empty())
-            return right_brother;
+            return {result_tag::RESULT, right_brother};
 
-        right_brother->flush(t, tree_root);
+        b_internal_ptr changed_subtree = std::dynamic_pointer_cast<b_internal<Key, Value>>(right_brother->flush(t, tree_root));
+        if (changed_subtree->id_ != right_brother->id_)
+            // Tree structure has been changed, looking for brother does not make sense anymore
+            return {result_tag::CONTINUE_FROM, changed_subtree};
 
-        return this->get_right_brother(parent, t, tree_root);
+        return {result_tag::RESULT, changed_subtree};
     }
 
     // Ensure this node has enough keys (and children) to safely delete one
     // If it's not, steal one child from any brother or merge with brother
     // Return node with desired amount of keys
-    b_internal_ptr ensure_enough_keys(std::size_t t, boost::optional<storage::node_id> & tree_root)
+    std::pair<result_tag, b_internal_ptr> ensure_enough_keys(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (!this->parent_ || this->keys_.size() != t - 1)
-            return std::dynamic_pointer_cast<b_internal>(this->shared_from_this());
+            return {result_tag::RESULT, std::dynamic_pointer_cast<b_internal>(this->shared_from_this())};
 
         b_buffer_ptr parent = this->load_parent();
 
@@ -399,7 +408,11 @@ struct b_internal : b_node<Key, Value>
         // Check brothers
         if (i + 1 <= parent->size())
         {
-            b_internal_ptr right_brother = this->get_right_brother(parent, t, tree_root);
+            std::pair<result_tag, b_internal_ptr> changed_subtree = this->get_right_brother(parent, t, tree_root);
+            if (changed_subtree.first == result_tag::CONTINUE_FROM)
+                return changed_subtree;
+
+            b_internal_ptr right_brother = changed_subtree.second;
 
             if (right_brother->keys_.size() >= t)
             {
@@ -454,19 +467,26 @@ struct b_internal : b_node<Key, Value>
                 // Delete right brother
                 this->storage_.delete_node(this->id_);
 
-                return left_brother;
+                return {result_tag::RESULT, left_brother};
             }
         }
 
-        return std::dynamic_pointer_cast<b_internal>(this->shared_from_this());
+        return {result_tag::RESULT, std::dynamic_pointer_cast<b_internal>(this->shared_from_this())};
     }
 
-    virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual std::vector<std::pair<Key, Value>>
+        remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
         b_internal_ptr node = std::dynamic_pointer_cast<b_internal>(this->shared_from_this());
 
         if (this->parent_)
-            node = this->ensure_enough_keys(t, tree_root);
+        {
+            auto changed_subtree = this->ensure_enough_keys(t, tree_root);
+            if (changed_subtree.first == result_tag::CONTINUE_FROM)
+                return changed_subtree.second->remove_left_leaf(t, tree_root);
+
+            node = changed_subtree.second;
+        }
 
         return this->storage_[node->children_.front()]
             -> remove_left_leaf(t, tree_root);
@@ -552,7 +572,8 @@ struct b_buffer : b_internal<Key, Value>
         return this->shared_from_this();
     }
 
-    virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual std::vector<std::pair<Key, Value>>
+        remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (this->pending_add_.empty())
             return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
