@@ -531,7 +531,10 @@ struct b_buffer : b_internal<Key, Value>
             pending_add_.pop();
             boost::optional<b_node_ptr> r = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
             if (r)
+            {
+                pending_add_.push(x);
                 return r;
+            }
         }
 
         return boost::none;
