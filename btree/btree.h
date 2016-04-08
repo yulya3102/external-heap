@@ -42,17 +42,20 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
     storage::cache<b_node> & storage_;
     storage::node_id id_;
     boost::optional<storage::node_id> parent_;
+    std::size_t level_;
 
-    b_node(storage::cache<b_node> & storage, const storage::node_id & id)
+    b_node(storage::cache<b_node> & storage, const storage::node_id & id, std::size_t level)
         : storage_(storage)
         , id_(id)
         , parent_(boost::none)
+        , level_(level)
     {}
 
     b_node(const b_node & other, storage::cache<b_node> & storage)
         : storage_(storage)
         , id_(other.id_)
         , parent_(other.parent_)
+        , level_(other.level_)
     {}
 
     virtual ~b_node() = default;
@@ -123,7 +126,7 @@ struct b_leaf : b_node<Key, Value>
     std::vector<std::pair<Key, Value> > values_;
 
     b_leaf(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id)
-        : b_node<Key, Value>(storage, id)
+        : b_node<Key, Value>(storage, id, 0)
     {}
 
     b_leaf(const b_leaf & other, storage::cache<b_node<Key, Value> > & storage)
@@ -155,7 +158,7 @@ struct b_leaf : b_node<Key, Value>
         assert(!parent || parent->size() < 2 * t - 1);
 
         if (!parent)
-            parent = b_buffer<Key, Value>::new_node(this->storage_);
+            parent = b_buffer<Key, Value>::new_node(this->storage_, this->level_ + 1);
         b_leaf_ptr brother = std::dynamic_pointer_cast<b_leaf>(this->new_brother());
 
         auto split_by_it = this->values_.begin();
@@ -249,8 +252,8 @@ struct b_internal : b_node<Key, Value>
     std::vector<Key> keys_;
     std::vector<storage::node_id> children_;
 
-    b_internal(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id)
-        : b_node<Key, Value>(storage, id)
+    b_internal(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id, std::size_t level)
+        : b_node<Key, Value>(storage, id, level)
     {}
 
     b_internal(const b_internal & other, storage::cache<b_node<Key, Value> > & storage)
@@ -272,7 +275,7 @@ struct b_internal : b_node<Key, Value>
         assert(!parent || parent->size() < 2 * t - 1);
 
         if (!parent)
-            parent = b_buffer<Key, Value>::new_node(this->storage_);
+            parent = b_buffer<Key, Value>::new_node(this->storage_, this->level_ + 1);
         b_internal_ptr brother = std::dynamic_pointer_cast<b_internal>(this->new_brother());
 
         auto split_keys = this->keys_.begin() + (t - 1);
@@ -495,8 +498,8 @@ struct b_buffer : b_internal<Key, Value>
 
     std::queue<std::pair<Key, Value> > pending_add_;
 
-    b_buffer(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id)
-        : b_internal<Key, Value>(storage, id)
+    b_buffer(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id, std::size_t level)
+        : b_internal<Key, Value>(storage, id, level)
     {}
 
     b_buffer(const b_buffer & other, storage::cache<b_node<Key, Value> > & storage)
@@ -510,14 +513,18 @@ struct b_buffer : b_internal<Key, Value>
         return new b_buffer(*this, *cache);
     }
 
-    static b_buffer_ptr new_node(storage::cache<b_node<Key, Value>> & cache)
+    static b_buffer_ptr new_node(storage::cache<b_node<Key, Value>> & cache, std::size_t level)
     {
-        return std::dynamic_pointer_cast<b_buffer>(cache.new_node([&cache] (storage::node_id id) { return new b_buffer(cache, id); }));
+        return std::dynamic_pointer_cast<b_buffer>(
+                    cache.new_node(
+                        [&cache, level] (storage::node_id id)
+                        { return new b_buffer(cache, id, level); }
+                    ));
     }
 
     virtual b_node_ptr new_brother() const
     {
-        return new_node(this->storage_);
+        return new_node(this->storage_, this->level_);
     }
 
     // Try to add all elements from pending list to the tree
