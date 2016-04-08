@@ -107,7 +107,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
     }
 
     // Try to add pair(key, value) to the tree.
-    // If it can be done without changing the tree structure, do it and return boost::none
+    // If it can be done without changing the higher-level tree structure, do it and return boost::none
     // else change tree structure and return root of the changed tree
     virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 
@@ -321,7 +321,14 @@ struct b_internal : b_node<Key, Value>
             std::size_t i = it - keys_.begin();
             b_node_ptr child = this->storage_[children_[i]];
 
-            return child->add(std::move(key), std::move(value), t, tree_root);
+            auto r = child->add(std::move(key), std::move(value), t, tree_root);
+            if (!r)
+                return boost::none;
+
+            if ((*r)->level_ > this->level_)
+                return r;
+
+            return this->add(std::move(key), std::move(value), t, tree_root);
         }
     }
 
@@ -528,7 +535,7 @@ struct b_buffer : b_internal<Key, Value>
     }
 
     // Try to add all elements from pending list to the tree
-    // If it can be done without changing the tree structure, do it and return boost::none
+    // If it can be done without changing the higher-level tree structure, do it and return boost::none
     // else change tree structure and return root of the changed tree
     boost::optional<b_buffer_ptr> flush(size_t t, boost::optional<storage::node_id> & tree_root)
     {
