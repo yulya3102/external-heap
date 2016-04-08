@@ -387,6 +387,9 @@ struct b_internal : b_node<Key, Value>
         if (right_brother->pending_add_.empty())
             return {result_tag::RESULT, right_brother};
 
+        // right brother may want to split, so
+        // parent should have < 2 * t - 1 keys
+        assert(parent->size() < 2 * t - 1);
         auto r = right_brother->flush(t, tree_root);
         if (r)
             return {result_tag::CONTINUE_FROM, std::dynamic_pointer_cast<b_internal<Key, Value>>(*r)};
