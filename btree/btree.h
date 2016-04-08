@@ -73,6 +73,17 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
     // Then return new parent of the node
     virtual b_buffer_ptr split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 
+    // Ensure node is not too big
+    // If its size == 2 * t - 1, split node and return its new parent
+    // else return boost::none
+    boost::optional<b_buffer_ptr> ensure_not_too_big(size_t t, boost::optional<storage::node_id> & tree_root)
+    {
+        if (this->size() == 2 * t - 1)
+            return split_full(this->load_parent(), t, tree_root);
+
+        return boost::none;
+    }
+
     // Make correct links from (maybe new) parent to the node and its new right brother
     // and update all parent links and root link if necessary
     void update_parent(b_internal_ptr parent, b_node_ptr new_brother, boost::optional<storage::node_id> & tree_root)
@@ -186,19 +197,15 @@ struct b_leaf : b_node<Key, Value>
 
     virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        if (size() == 2 * t - 1)
-        {
-            b_buffer_ptr parent = this->load_parent();
-            return this->split_full(parent, t, tree_root);
-        }
-        else
-        {
-            auto v = std::make_pair(std::move(key), std::move(value));
-            auto it = std::lower_bound(this->values_.begin(), this->values_.end(), v);
-            this->values_.insert(it, std::move(v));
+        auto r = this->ensure_not_too_big(t, tree_root);
+        if (r)
+            return r;
 
-            return boost::none;
-        }
+        auto v = std::make_pair(std::move(key), std::move(value));
+        auto it = std::lower_bound(this->values_.begin(), this->values_.end(), v);
+        this->values_.insert(it, std::move(v));
+
+        return boost::none;
     }
 
     // Remove this leaf from parent tree and return values from it
@@ -310,26 +317,22 @@ struct b_internal : b_node<Key, Value>
     {
         assert(std::is_sorted(keys_.begin(), keys_.end()));
 
-        if (size() == 2 * t - 1)
-        {
-            b_buffer_ptr parent = this->load_parent();
-            return this->split_full(parent, t, tree_root);
-        }
-        else
-        {
-            auto it = std::lower_bound(keys_.begin(), keys_.end(), key);
-            std::size_t i = it - keys_.begin();
-            b_node_ptr child = this->storage_[children_[i]];
+        auto r = this->ensure_not_too_big(t, tree_root);
+        if (r)
+            return r;
 
-            auto r = child->add(std::move(key), std::move(value), t, tree_root);
-            if (!r)
-                return boost::none;
+        auto it = std::lower_bound(keys_.begin(), keys_.end(), key);
+        std::size_t i = it - keys_.begin();
+        b_node_ptr child = this->storage_[children_[i]];
 
-            if ((*r)->level_ > this->level_)
-                return r;
+        r = child->add(std::move(key), std::move(value), t, tree_root);
+        if (!r)
+            return boost::none;
 
-            return this->add(std::move(key), std::move(value), t, tree_root);
-        }
+        if ((*r)->level_ > this->level_)
+            return r;
+
+        return this->add(std::move(key), std::move(value), t, tree_root);
     }
 
     void merge_with_right_brother(std::size_t i, b_internal_ptr right_brother, std::size_t t, boost::optional<storage::node_id> & tree_root)
