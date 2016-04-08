@@ -448,6 +448,10 @@ struct b_internal : b_node<Key, Value>
             }
             else
             {
+                auto r = parent->ensure_enough_keys(t, tree_root);
+                if (r)
+                    return r;
+
                 this->merge_with_right_brother(i, right_brother, t, tree_root);
 
                 // Delete right brother
@@ -475,6 +479,10 @@ struct b_internal : b_node<Key, Value>
             }
             else
             {
+                auto r = parent->ensure_enough_keys(t, tree_root);
+                if (r)
+                    return r;
+
                 left_brother->merge_with_right_brother(
                             i - 1,
                             std::dynamic_pointer_cast<b_internal>(this->shared_from_this()),
