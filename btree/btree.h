@@ -525,7 +525,7 @@ struct b_buffer : b_internal<Key, Value>
     // Return root of flushed subtree
     b_node_ptr flush(size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        if (!pending_add_.empty())
+        while (!pending_add_.empty())
         {
             auto x = std::move(pending_add_.front());
             pending_add_.pop();
@@ -535,8 +535,6 @@ struct b_buffer : b_internal<Key, Value>
                 // TODO: fix double std::move()
                 r = (*r)->add(std::move(x.first), std::move(x.second), t, tree_root);
             }
-
-            return this->flush(t, tree_root);
         }
 
         return this->shared_from_this();
