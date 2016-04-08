@@ -103,8 +103,10 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
         new_brother->parent_ = parent->id_;
     }
 
-    // Add pair(key, value) to the subtree and return root of changed subtree
-    virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
+    // Try to add pair(key, value) to the tree.
+    // If it can be done without changing the tree structure, do it and return boost::none
+    // else change tree structure and return root of the changed tree
+    virtual boost::optional<b_node_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 
     // Remove left leaf from subtree and return values from it
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root) = 0;
@@ -179,14 +181,12 @@ struct b_leaf : b_node<Key, Value>
         return parent;
     }
 
-    virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual boost::optional<b_node_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (size() == 2 * t - 1)
         {
             b_buffer_ptr parent = this->load_parent();
-            parent = this->split_full(parent, t, tree_root);
-
-            return parent->add(std::move(key), std::move(value), t, tree_root);
+            return std::dynamic_pointer_cast<b_node<Key, Value>>(this->split_full(parent, t, tree_root));
         }
         else
         {
@@ -194,7 +194,7 @@ struct b_leaf : b_node<Key, Value>
             auto it = std::lower_bound(this->values_.begin(), this->values_.end(), v);
             this->values_.insert(it, std::move(v));
 
-            return this->shared_from_this();
+            return boost::none;
         }
     }
 
@@ -303,16 +303,14 @@ struct b_internal : b_node<Key, Value>
         return parent;
     }
 
-    virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual boost::optional<b_node_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(std::is_sorted(keys_.begin(), keys_.end()));
 
         if (size() == 2 * t - 1)
         {
             b_buffer_ptr parent = this->load_parent();
-            parent = this->split_full(parent, t, tree_root);
-
-            return parent->add(std::move(key), std::move(value), t, tree_root);
+            return std::dynamic_pointer_cast<b_node<Key, Value>>(this->split_full(parent, t, tree_root));
         }
         else
         {
@@ -320,11 +318,7 @@ struct b_internal : b_node<Key, Value>
             std::size_t i = it - keys_.begin();
             b_node_ptr child = this->storage_[children_[i]];
 
-            b_node_ptr changed_subtree = child->add(std::move(key), std::move(value), t, tree_root);
-            if (changed_subtree->id_ == child->id_)
-                return this->shared_from_this();
-
-            return changed_subtree;
+            return child->add(std::move(key), std::move(value), t, tree_root);
         }
     }
 
@@ -535,8 +529,14 @@ struct b_buffer : b_internal<Key, Value>
         {
             auto x = std::move(pending_add_.front());
             pending_add_.pop();
-            b_node_ptr changed_subtree = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
-            return std::dynamic_pointer_cast<b_buffer>(changed_subtree)->flush(t, tree_root);
+            boost::optional<b_node_ptr> r = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
+            while (r)
+            {
+                // TODO: fix double std::move()
+                r = (*r)->add(std::move(x.first), std::move(x.second), t, tree_root);
+            }
+
+            return this->flush(t, tree_root);
         }
 
         return this->shared_from_this();
@@ -555,21 +555,16 @@ struct b_buffer : b_internal<Key, Value>
         return parent;
     }
 
-    virtual b_node_ptr add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual boost::optional<b_node_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (this->pending_add_.size() == t)
         {
             b_node_ptr next_add = this->flush(t, tree_root);
-            b_node_ptr changed_subtree = next_add->add(std::move(key), std::move(value), t, tree_root);
-
-            if (changed_subtree->id_ == next_add->id_)
-                return this->shared_from_this();
-
-            return changed_subtree;
+            return next_add->add(std::move(key), std::move(value), t, tree_root);
         }
 
         pending_add_.push(std::make_pair(std::move(key), std::move(value)));
-        return this->shared_from_this();
+        return boost::none;
     }
 
     virtual std::vector<std::pair<Key, Value>>
@@ -596,7 +591,14 @@ struct b_tree
     void add(Key key, Value value)
     {
         b_node_ptr root = load_root();
-        root->add(std::move(key), std::move(value), t, root_);
+
+        boost::optional<b_node_ptr> r(root);
+        do
+        {
+            // TODO: fix double move
+            r = (*r)->add(std::move(key), std::move(value), t, root_);
+        }
+        while (r);
     }
 
     template <typename OutIter>
