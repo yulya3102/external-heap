@@ -377,12 +377,11 @@ struct b_internal : b_node<Key, Value>
         if (right_brother->pending_add_.empty())
             return {result_tag::RESULT, right_brother};
 
-        b_internal_ptr changed_subtree = std::dynamic_pointer_cast<b_internal<Key, Value>>(right_brother->flush(t, tree_root));
-        if (changed_subtree->id_ != right_brother->id_)
-            // Tree structure has been changed, looking for brother does not make sense anymore
-            return {result_tag::CONTINUE_FROM, changed_subtree};
+        auto r = right_brother->flush(t, tree_root);
+        if (r)
+            return {result_tag::CONTINUE_FROM, std::dynamic_pointer_cast<b_internal<Key, Value>>(*r)};
 
-        return {result_tag::RESULT, changed_subtree};
+        return {result_tag::RESULT, right_brother};
     }
 
     // Ensure this node has enough keys (and children) to safely delete one
@@ -521,23 +520,21 @@ struct b_buffer : b_internal<Key, Value>
         return new_node(this->storage_);
     }
 
-    // Flush the subtree
-    // Return root of flushed subtree
-    b_node_ptr flush(size_t t, boost::optional<storage::node_id> & tree_root)
+    // Try to add all elements from pending list to the tree
+    // If it can be done without changing the tree structure, do it and return boost::none
+    // else change tree structure and return root of the changed tree
+    boost::optional<b_node_ptr> flush(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         while (!pending_add_.empty())
         {
             auto x = std::move(pending_add_.front());
             pending_add_.pop();
             boost::optional<b_node_ptr> r = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
-            while (r)
-            {
-                // TODO: fix double std::move()
-                r = (*r)->add(std::move(x.first), std::move(x.second), t, tree_root);
-            }
+            if (r)
+                return r;
         }
 
-        return this->shared_from_this();
+        return boost::none;
     }
 
     virtual b_buffer_ptr split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
@@ -557,8 +554,9 @@ struct b_buffer : b_internal<Key, Value>
     {
         if (this->pending_add_.size() == t)
         {
-            b_node_ptr next_add = this->flush(t, tree_root);
-            return next_add->add(std::move(key), std::move(value), t, tree_root);
+            boost::optional<b_node_ptr> r = this->flush(t, tree_root);
+            if (r)
+                return r;
         }
 
         pending_add_.push(std::make_pair(std::move(key), std::move(value)));
@@ -571,8 +569,10 @@ struct b_buffer : b_internal<Key, Value>
         if (this->pending_add_.empty())
             return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
 
-        b_node_ptr next = this->flush(t, tree_root);
-        return next->remove_left_leaf(t, tree_root);
+        boost::optional<b_node_ptr> r = this->flush(t, tree_root);
+        if (r)
+            return (*r)->remove_left_leaf(t, tree_root);
+        return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
     }
 };
 }
