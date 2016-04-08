@@ -243,9 +243,12 @@ struct b_leaf : b_node<Key, Value>
 
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        auto r = this->load_parent()->ensure_enough_keys(t, tree_root);
-        if (r)
-            return (*r)->remove_left_leaf(t, tree_root);
+        if (this->parent_)
+        {
+            auto r = this->load_parent()->ensure_enough_keys(t, tree_root);
+            if (r)
+                return (*r)->remove_left_leaf(t, tree_root);
+        }
 
         auto result = this->remove(t, tree_root);
         this->storage_.delete_node(this->id_);
