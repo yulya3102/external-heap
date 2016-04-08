@@ -106,7 +106,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >
     // Try to add pair(key, value) to the tree.
     // If it can be done without changing the tree structure, do it and return boost::none
     // else change tree structure and return root of the changed tree
-    virtual boost::optional<b_node_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
+    virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 
     // Remove left leaf from subtree and return values from it
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root) = 0;
@@ -181,12 +181,12 @@ struct b_leaf : b_node<Key, Value>
         return parent;
     }
 
-    virtual boost::optional<b_node_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (size() == 2 * t - 1)
         {
             b_buffer_ptr parent = this->load_parent();
-            return std::dynamic_pointer_cast<b_node<Key, Value>>(this->split_full(parent, t, tree_root));
+            return this->split_full(parent, t, tree_root);
         }
         else
         {
@@ -303,14 +303,14 @@ struct b_internal : b_node<Key, Value>
         return parent;
     }
 
-    virtual boost::optional<b_node_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(std::is_sorted(keys_.begin(), keys_.end()));
 
         if (size() == 2 * t - 1)
         {
             b_buffer_ptr parent = this->load_parent();
-            return std::dynamic_pointer_cast<b_node<Key, Value>>(this->split_full(parent, t, tree_root));
+            return this->split_full(parent, t, tree_root);
         }
         else
         {
@@ -523,13 +523,13 @@ struct b_buffer : b_internal<Key, Value>
     // Try to add all elements from pending list to the tree
     // If it can be done without changing the tree structure, do it and return boost::none
     // else change tree structure and return root of the changed tree
-    boost::optional<b_node_ptr> flush(size_t t, boost::optional<storage::node_id> & tree_root)
+    boost::optional<b_buffer_ptr> flush(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         while (!pending_add_.empty())
         {
             auto x = std::move(pending_add_.front());
             pending_add_.pop();
-            boost::optional<b_node_ptr> r = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
+            boost::optional<b_buffer_ptr> r = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
             if (r)
             {
                 pending_add_.push(x);
@@ -553,11 +553,11 @@ struct b_buffer : b_internal<Key, Value>
         return parent;
     }
 
-    virtual boost::optional<b_node_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (this->pending_add_.size() == t)
         {
-            boost::optional<b_node_ptr> r = this->flush(t, tree_root);
+            boost::optional<b_buffer_ptr> r = this->flush(t, tree_root);
             if (r)
                 return r;
         }
@@ -572,7 +572,7 @@ struct b_buffer : b_internal<Key, Value>
         if (this->pending_add_.empty())
             return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
 
-        boost::optional<b_node_ptr> r = this->flush(t, tree_root);
+        boost::optional<b_buffer_ptr> r = this->flush(t, tree_root);
         if (r)
             return (*r)->remove_left_leaf(t, tree_root);
         return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
