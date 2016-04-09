@@ -103,12 +103,12 @@ TEST(btree, random)
 TEST(btree, independent)
 {
     std::default_random_engine generator;
-    std::uniform_int_distribution<std::int64_t> distribution(1, 100);
+    std::uniform_int_distribution<std::int64_t> distribution(1, 1000);
     std::function<int()> random = std::bind(distribution, generator);
 
     storage::memory<detail::b_node<int, int>> mem1;
     bptree::b_tree<int, int, 6> tree1(mem1);
-    std::size_t size1 = random() * 10;
+    std::size_t size1 = random() * 100;
     for (std::size_t i = 0; i < size1; ++i)
     {
         auto x = random();
