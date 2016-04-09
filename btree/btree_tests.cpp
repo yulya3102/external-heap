@@ -20,7 +20,8 @@ std::vector<std::pair<K, V> > from_tree(bptree::b_tree<K, V, t> & tree)
 
 TEST(btree, init)
 {
-    bptree::b_tree<int, int, 3> tree;
+    storage::memory<detail::b_node<int, int>> mem;
+    bptree::b_tree<int, int, 3> tree(mem);
     for (size_t i = 0; i < 10; ++i)
         tree.add(i, i);
     for (size_t i = 20; i < 30; ++i)
@@ -35,7 +36,8 @@ TEST(btree, init)
 
 TEST(btree, repeating)
 {
-    bptree::b_tree<int, std::string, 3> tree;
+    storage::memory<detail::b_node<int, std::string>> mem;
+    bptree::b_tree<int, std::string, 3> tree(mem);
 
     std::default_random_engine generator;
     std::uniform_int_distribution<std::int64_t> distribution(1, 1000);
@@ -71,7 +73,8 @@ TEST(btree, repeating)
 
 TEST(btree, random)
 {
-    bptree::b_tree<int, std::string, 5> tree;
+    storage::memory<detail::b_node<int, std::string>> mem;
+    bptree::b_tree<int, std::string, 5> tree(mem);
     std::vector<std::pair<int, std::string> > src, dest;
 
     std::default_random_engine generator;
@@ -103,7 +106,8 @@ TEST(btree, independent)
     std::uniform_int_distribution<std::int64_t> distribution(1, 100);
     std::function<int()> random = std::bind(distribution, generator);
 
-    bptree::b_tree<int, int, 6> tree1;
+    storage::memory<detail::b_node<int, int>> mem1;
+    bptree::b_tree<int, int, 6> tree1(mem1);
     std::size_t size1 = random() * 10;
     for (std::size_t i = 0; i < size1; ++i)
     {
@@ -111,7 +115,9 @@ TEST(btree, independent)
         tree1.add(x, x);
     }
 
-    bptree::b_tree<int, int, 6> tree2(tree1);
+    tree1.flush_cache();
+    storage::memory<detail::b_node<int, int>> mem2(mem1);
+    bptree::b_tree<int, int, 6> tree2(mem2);
     std::size_t size2 = random() * 10;
     for (std::size_t i = 0; i < size2; ++i)
     {

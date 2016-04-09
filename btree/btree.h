@@ -644,15 +644,16 @@ namespace bptree
 template <typename Key, typename Value, int t>
 struct b_tree
 {
-    b_tree()
-        : nodes_(storage_)
+    b_tree(storage::memory<detail::b_node<Key, Value>> & storage)
+        : nodes_(storage)
     {}
 
-    b_tree(const b_tree & other)
-        : root_(other.root_)
-        , storage_(other.storage_)
-        , nodes_(storage_)
-    {}
+    b_tree(const b_tree & other) = delete;
+
+    void flush_cache()
+    {
+        nodes_.flush();
+    }
 
     void add(Key key, Value value)
     {
@@ -698,7 +699,6 @@ private:
     using b_buffer_ptr = typename detail::b_node<Key, Value>::b_buffer_ptr;
 
     boost::optional<storage::node_id> root_;
-    storage::memory<detail::b_node<Key, Value> > storage_;
     storage::cache<detail::b_node<Key, Value> > nodes_;
 
     using leaf_t = detail::b_leaf<Key, Value>;
