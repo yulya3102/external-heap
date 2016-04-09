@@ -40,10 +40,15 @@ struct cache
         cached_nodes.erase(it);
     }
 
-    ~cache()
+    void flush()
     {
         for (auto node : cached_nodes)
             storage_.write_node(node.first, node.second.get());
+    }
+
+    ~cache()
+    {
+        flush();
     }
 
 private:
