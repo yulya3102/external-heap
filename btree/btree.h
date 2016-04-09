@@ -90,16 +90,20 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
     // Split node: replace the node with its parent (or new internal node)
     // make new node (right brother) of the same type as the node
     // and make the node and its new brother children of the new internal node
-    // Then return new parent of the node
-    virtual b_buffer_ptr split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
+    // If it can be done without changing the higher-level tree structure, do it and return { RESULT, new parent of the node }
+    // else return { CONTINUE_FROM, node that should be split first }
+    virtual std::pair<result_tag, b_buffer_ptr> split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 
     // Ensure node is not too big
-    // If its size == 2 * t - 1, split node and return its new parent
+    // If its size == 2 * t - 1, split node or someone above it and return parent of split node
     // else return boost::none
     boost::optional<b_buffer_ptr> ensure_not_too_big(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (this->size() == 2 * t - 1)
-            return split_full(this->load_parent(), t, tree_root);
+        {
+            auto r = split_full(this->load_parent(), t, tree_root);
+            return r.second;
+        }
 
         return boost::none;
     }
@@ -190,7 +194,7 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
 
     virtual ~b_leaf() = default;
 
-    virtual b_buffer_ptr split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual std::pair<result_tag, b_buffer_ptr> split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(this->size() == 2 * t - 1);
         assert(!parent || parent->size() < 2 * t - 1);
@@ -219,7 +223,7 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
         // and update all parent links
         this->update_parent(parent, brother, tree_root);
 
-        return parent;
+        return { result_tag::RESULT, parent };
     }
 
     virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
@@ -314,7 +318,7 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
 
     virtual ~b_internal() = default;
 
-    virtual b_buffer_ptr split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual std::pair<result_tag, b_buffer_ptr> split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(this->size() == 2 * t - 1);
         assert(!parent || parent->size() < 2 * t - 1);
@@ -348,7 +352,7 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
         // and update all parent links
         this->update_parent(parent, brother, tree_root);
 
-        return parent;
+        return { result_tag::RESULT, parent };
     }
 
     virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
@@ -602,9 +606,14 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
         return boost::none;
     }
 
-    virtual b_buffer_ptr split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual std::pair<result_tag, b_buffer_ptr> split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        parent = std::dynamic_pointer_cast<b_buffer>(b_internal<Key, Value>::split_full(parent, t, tree_root));
+        auto r = b_internal<Key, Value>::split_full(parent, t, tree_root);
+
+        if (r.first == result_tag::CONTINUE_FROM)
+            return r;
+
+        parent = std::dynamic_pointer_cast<b_buffer>(r.second);
 
         while (!this->pending_add_.empty())
         {
@@ -612,7 +621,7 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
             this->pending_add_.pop();
         }
 
-        return parent;
+        return { result_tag::RESULT, parent };
     }
 
     virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
