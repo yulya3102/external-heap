@@ -117,7 +117,7 @@ TEST(btree, independent)
 
     tree1.flush_cache();
     storage::memory<detail::b_node<int, int>> mem2(mem1);
-    bptree::b_tree<int, int, 6> tree2(mem2);
+    bptree::b_tree<int, int, 6> tree2(mem2, tree1.root_id());
     std::size_t size2 = random() * 10;
     for (std::size_t i = 0; i < size2; ++i)
     {
