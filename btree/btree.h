@@ -57,19 +57,20 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
     using b_internal_ptr = std::shared_ptr<b_internal<Key, Value> >;
     using b_buffer_ptr = std::shared_ptr<b_buffer<Key, Value> >;
     using b_leaf_ptr = std::shared_ptr<b_leaf<Key, Value> >;
+    using cache_t = storage::cache<b_node>;
 
     virtual std::size_t size() const = 0;
     virtual b_node * copy(const storage::memory<b_node> & storage) const = 0;
     virtual b_node_ptr new_brother() const = 0;
 
-    storage::cache<b_node> & storage_;
+    cache_t & storage_;
 
-    b_node(storage::cache<b_node> & storage, const storage::node_id & id, std::size_t level)
+    b_node(cache_t & storage, const storage::node_id & id, std::size_t level)
         : b_node_data{id, boost::none, level}
         , storage_(storage)
     {}
 
-    b_node(const b_node & other, storage::cache<b_node> & storage)
+    b_node(const b_node & other, cache_t & storage)
         : b_node_data{other.id_, other.parent_, other.level_}
         , storage_(storage)
     {}
@@ -155,13 +156,14 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
     using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
     using b_leaf_ptr = typename b_node<Key, Value>::b_leaf_ptr;
     using b_buffer_ptr = typename b_node<Key, Value>::b_buffer_ptr;
+    using cache_t = typename b_node<Key, Value>::cache_t;
 
-    b_leaf(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id)
+    b_leaf(cache_t & storage, const storage::node_id & id)
         : b_node_data(id, boost::none, 0)
         , b_node<Key, Value>(storage, id, 0)
     {}
 
-    b_leaf(const b_leaf & other, storage::cache<b_node<Key, Value> > & storage)
+    b_leaf(const b_leaf & other, cache_t & storage)
         : b_node_data(other)
         , b_node<Key, Value>(other, storage)
         , b_leaf_data<Key, Value>(other)
@@ -174,7 +176,7 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
 
     virtual b_leaf * copy(const storage::memory<b_node<Key, Value> > & storage) const
     {
-        auto cache = new storage::cache<b_node<Key, Value>>(const_cast<storage::memory<b_node<Key, Value> > & >(storage));
+        auto cache = new cache_t(const_cast<storage::memory<b_node<Key, Value> > & >(storage));
         return new b_leaf(*this, *cache);
     }
 
@@ -291,12 +293,13 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key>
     using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
     using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
     using b_buffer_ptr = typename b_node<Key, Value>::b_buffer_ptr;
+    using cache_t = typename b_node<Key, Value>::cache_t;
 
-    b_internal(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id, std::size_t level)
+    b_internal(cache_t & storage, const storage::node_id & id, std::size_t level)
         : b_node<Key, Value>(storage, id, level)
     {}
 
-    b_internal(const b_internal & other, storage::cache<b_node<Key, Value> > & storage)
+    b_internal(const b_internal & other, cache_t & storage)
         : b_node<Key, Value>(other, storage)
         , b_internal_data<Key>{other.keys_, other.children_}
     {}
@@ -542,13 +545,14 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
     using b_buffer_ptr = typename b_node<Key, Value>::b_buffer_ptr;
     using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
     using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
+    using cache_t = typename b_node<Key, Value>::cache_t;
 
-    b_buffer(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id, std::size_t level)
+    b_buffer(cache_t & storage, const storage::node_id & id, std::size_t level)
         : b_node_data{id, boost::none, level}
         , b_internal<Key, Value>(storage, id, level)
     {}
 
-    b_buffer(const b_buffer & other, storage::cache<b_node<Key, Value> > & storage)
+    b_buffer(const b_buffer & other, cache_t & storage)
         : b_node_data(other)
         , b_internal<Key, Value>(other)
         , b_buffer_data<Key, Value>(other)
@@ -556,11 +560,11 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
 
     virtual b_buffer * copy(const storage::memory<b_node<Key, Value> > & storage) const
     {
-        auto cache = new storage::cache<b_node<Key, Value>>(const_cast<storage::memory<b_node<Key, Value> > & >(storage));
+        auto cache = new cache_t(const_cast<storage::memory<b_node<Key, Value> > & >(storage));
         return new b_buffer(*this, *cache);
     }
 
-    static b_buffer_ptr new_node(storage::cache<b_node<Key, Value>> & cache, std::size_t level)
+    static b_buffer_ptr new_node(cache_t & cache, std::size_t level)
     {
         return std::dynamic_pointer_cast<b_buffer>(
                     cache.new_node(
