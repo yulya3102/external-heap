@@ -28,6 +28,7 @@ struct b_buffer;
 template <typename Key, typename Value>
 struct b_leaf;
 
+template <typename Key, typename Value>
 struct b_node_data
 {
     storage::node_id id_;
@@ -51,7 +52,7 @@ struct b_node_data
 };
 
 template <typename Key, typename Value>
-struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_node_data
+struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_node_data<Key, Value>
 {
     using b_node_ptr = std::shared_ptr<b_node>;
     using b_internal_ptr = std::shared_ptr<b_internal<Key, Value> >;
@@ -66,12 +67,12 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
     cache_t & storage_;
 
     b_node(cache_t & storage, const storage::node_id & id, std::size_t level)
-        : b_node_data{id, boost::none, level}
+        : b_node_data<Key, Value>{id, boost::none, level}
         , storage_(storage)
     {}
 
     b_node(const b_node & other, cache_t & storage)
-        : b_node_data{other.id_, other.parent_, other.level_}
+        : b_node_data<Key, Value>{other.id_, other.parent_, other.level_}
         , storage_(storage)
     {}
 
@@ -79,8 +80,8 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
 
     b_buffer_ptr load_parent() const
     {
-        if (parent_)
-            return std::dynamic_pointer_cast<b_buffer<Key, Value> >(storage_[*parent_]);
+        if (this->parent_)
+            return std::dynamic_pointer_cast<b_buffer<Key, Value> >(storage_[*this->parent_]);
         return nullptr;
     }
 
@@ -109,7 +110,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
         // to old child and to new child
         // or just add two new links if parent is empty
         {
-            auto it = std::find(parent->children_.begin(), parent->children_.end(), id_);
+            auto it = std::find(parent->children_.begin(), parent->children_.end(), this->id_);
             // *it == this || it == end
             if (it != parent->children_.end())
                 it = parent->children_.erase(it);
@@ -118,7 +119,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
             it = parent->children_.insert(it, new_brother->id_);
             // *it == new_brother
             // insert before it
-            it = parent->children_.insert(it, id_);
+            it = parent->children_.insert(it, this->id_);
             // *it == this
         }
 
@@ -144,7 +145,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
 };
 
 template <typename Key, typename Value>
-struct b_leaf_data : virtual b_node_data
+struct b_leaf_data : virtual b_node_data<Key, Value>
 {
     std::vector<std::pair<Key, Value>> values_;
 };
@@ -159,12 +160,12 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
     using cache_t = typename b_node<Key, Value>::cache_t;
 
     b_leaf(cache_t & storage, const storage::node_id & id)
-        : b_node_data(id, boost::none, 0)
+        : b_node_data<Key, Value>(id, boost::none, 0)
         , b_node<Key, Value>(storage, id, 0)
     {}
 
     b_leaf(const b_leaf & other, cache_t & storage)
-        : b_node_data(other)
+        : b_node_data<Key, Value>(other)
         , b_node<Key, Value>(other, storage)
         , b_leaf_data<Key, Value>(other)
     {}
@@ -280,15 +281,15 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
     }
 };
 
-template <typename Key>
-struct b_internal_data : virtual b_node_data
+template <typename Key, typename Value>
+struct b_internal_data : virtual b_node_data<Key, Value>
 {
     std::vector<Key> keys_;
     std::vector<storage::node_id> children_;
 };
 
 template <typename Key, typename Value>
-struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key>
+struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
 {
     using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
     using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
@@ -301,7 +302,7 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key>
 
     b_internal(const b_internal & other, cache_t & storage)
         : b_node<Key, Value>(other, storage)
-        , b_internal_data<Key>{other.keys_, other.children_}
+        , b_internal_data<Key, Value>{other.keys_, other.children_}
     {}
 
     virtual std::size_t size() const
@@ -534,7 +535,7 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key>
 };
 
 template <typename Key, typename Value>
-struct b_buffer_data : virtual b_internal_data<Key>
+struct b_buffer_data : virtual b_internal_data<Key, Value>
 {
     std::queue<std::pair<Key, Value> > pending_add_;
 };
@@ -548,12 +549,12 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
     using cache_t = typename b_node<Key, Value>::cache_t;
 
     b_buffer(cache_t & storage, const storage::node_id & id, std::size_t level)
-        : b_node_data{id, boost::none, level}
+        : b_node_data<Key, Value>{id, boost::none, level}
         , b_internal<Key, Value>(storage, id, level)
     {}
 
     b_buffer(const b_buffer & other, cache_t & storage)
-        : b_node_data(other)
+        : b_node_data<Key, Value>(other)
         , b_internal<Key, Value>(other)
         , b_buffer_data<Key, Value>(other)
     {}
