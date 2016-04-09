@@ -5,6 +5,7 @@
 #include <cassert>
 #include <algorithm>
 #include <queue>
+#include <exception>
 
 #include <boost/optional.hpp>
 
@@ -32,6 +33,21 @@ struct b_node_data
     storage::node_id id_;
     boost::optional<storage::node_id> parent_;
     std::size_t level_;
+
+    b_node_data()
+    {
+        throw std::logic_error(
+            "b_node_data(): this constructor should never be called"
+        );
+    }
+
+    b_node_data(const storage::node_id & id,
+                const boost::optional<storage::node_id> & parent,
+                std::size_t level)
+        : id_(id)
+        , parent_(parent)
+        , level_(level)
+    {}
 };
 
 template <typename Key, typename Value>
@@ -141,12 +157,12 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
     using b_buffer_ptr = typename b_node<Key, Value>::b_buffer_ptr;
 
     b_leaf(storage::cache<b_node<Key, Value> > & storage, const storage::node_id & id)
-        : b_node_data{id, boost::none, 0}
+        : b_node_data(id, boost::none, 0)
         , b_node<Key, Value>(storage, id, 0)
     {}
 
     b_leaf(const b_leaf & other, storage::cache<b_node<Key, Value> > & storage)
-        : b_node_data{other.id_, boost::none, 0}
+        : b_node_data(other)
         , b_node<Key, Value>(other, storage)
         , b_leaf_data<Key, Value>(other)
     {}
