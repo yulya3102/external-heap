@@ -49,6 +49,8 @@ struct b_node_data
         , parent_(parent)
         , level_(level)
     {}
+
+    virtual ~b_node_data() = default;
 };
 
 template <typename Key, typename Value>
