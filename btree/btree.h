@@ -648,6 +648,12 @@ struct b_tree
         : nodes_(storage_)
     {}
 
+    b_tree(const b_tree & other)
+        : root_(other.root_)
+        , storage_(other.storage_)
+        , nodes_(storage_)
+    {}
+
     void add(Key key, Value value)
     {
         b_node_ptr root = load_root();
