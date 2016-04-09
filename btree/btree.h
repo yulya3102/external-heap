@@ -557,6 +557,7 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
 
     b_buffer(const b_buffer & other, cache_t & storage)
         : b_node_data<Key, Value>(other)
+        , b_internal_data<Key, Value>(other)
         , b_internal<Key, Value>(other)
         , b_buffer_data<Key, Value>(other)
     {}
