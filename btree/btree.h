@@ -303,8 +303,8 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
     {}
 
     b_internal(const b_internal & other, cache_t & storage)
-        : b_node<Key, Value>(other, storage)
-        , b_internal_data<Key, Value>{other.keys_, other.children_}
+        : b_internal_data<Key, Value>(other)
+        , b_node<Key, Value>(other, storage)
     {}
 
     virtual std::size_t size() const
@@ -558,7 +558,7 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
     b_buffer(const b_buffer & other, cache_t & storage)
         : b_node_data<Key, Value>(other)
         , b_internal_data<Key, Value>(other)
-        , b_internal<Key, Value>(other)
+        , b_internal<Key, Value>(other, storage)
         , b_buffer_data<Key, Value>(other)
     {}
 
