@@ -87,7 +87,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value, Serialized>>, vi
     // and make the node and its new brother children of the new internal node
     // If it can be done without changing the higher-level tree structure, do it and return { RESULT, new parent of the node }
     // else return { CONTINUE_FROM, node that should be split first }
-    virtual std::pair<result_tag, b_buffer_ptr> split_full(size_t t, boost::optional<storage::node_id> & tree_root) = 0;
+    virtual std::pair<result_tag, storage::node_id> split_full(size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 
     // Ensure node is not too big
     // If its size == 2 * t - 1, split node or someone above it and return parent of split node
@@ -97,7 +97,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value, Serialized>>, vi
         if (this->size() == 2 * t - 1)
         {
             auto r = split_full(t, tree_root);
-            return r.second;
+            return this->buffer(r.second);
         }
 
         return boost::none;
@@ -189,7 +189,7 @@ struct b_leaf : b_node<Key, Value, Serialized>, b_leaf_data<Key, Value>
 
     virtual ~b_leaf() = default;
 
-    virtual std::pair<result_tag, b_buffer_ptr> split_full(size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual std::pair<result_tag, storage::node_id> split_full(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(this->size() == 2 * t - 1);
 
@@ -197,7 +197,7 @@ struct b_leaf : b_node<Key, Value, Serialized>, b_leaf_data<Key, Value>
         {
             auto r = this->parent()->ensure_not_too_big(t, tree_root);
             if (r)
-                return { result_tag::CONTINUE_FROM, *r };
+                return { result_tag::CONTINUE_FROM, (*r)->id_ };
         }
 
         if (!this->parent())
@@ -227,7 +227,8 @@ struct b_leaf : b_node<Key, Value, Serialized>, b_leaf_data<Key, Value>
         // and update all parent links
         this->update_parent(brother->id_, tree_root);
 
-        return { result_tag::RESULT, this->parent() };
+        assert(static_cast<bool>(this->parent_));
+        return { result_tag::RESULT, *(this->parent_) };
     }
 
     virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
@@ -318,7 +319,7 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
 
     virtual ~b_internal() = default;
 
-    virtual std::pair<result_tag, b_buffer_ptr> split_full(size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual std::pair<result_tag, storage::node_id> split_full(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(this->size() == 2 * t - 1);
 
@@ -326,7 +327,7 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
         {
             auto r = this->parent()->ensure_not_too_big(t, tree_root);
             if (r)
-                return { result_tag::CONTINUE_FROM, *r };
+                return { result_tag::CONTINUE_FROM, (*r)->id_ };
         }
 
         if (!this->parent())
@@ -361,7 +362,8 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
         // and update all parent links
         this->update_parent(brother, tree_root);
 
-        return { result_tag::RESULT, this->parent() };
+        assert(static_cast<bool>(this->parent_));
+        return { result_tag::RESULT, *(this->parent_) };
     }
 
     virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
@@ -606,7 +608,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
         return boost::none;
     }
 
-    virtual std::pair<result_tag, b_buffer_ptr> split_full(size_t t, boost::optional<storage::node_id> & tree_root)
+    virtual std::pair<result_tag, storage::node_id> split_full(size_t t, boost::optional<storage::node_id> & tree_root)
     {
         auto r = b_internal<Key, Value, Serialized>::split_full(t, tree_root);
 
@@ -616,7 +618,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
         // r.first == result_tag::RESULT
         // it means there were no higher-level splits
 
-        assert(this->parent_ == r.second->id_);
+        assert(this->parent_ == r.second);
 
         std::queue<std::pair<Key, Value>> keep_pending;
         while (!this->pending_add_.empty())
@@ -650,7 +652,8 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
         }
         this->pending_add_.swap(keep_pending);
 
-        return { result_tag::RESULT, this->parent() };
+        assert(static_cast<bool>(this->parent_));
+        return { result_tag::RESULT, *(this->parent_) };
     }
 
     virtual boost::optional<b_buffer_ptr> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
