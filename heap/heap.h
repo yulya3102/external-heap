@@ -45,6 +45,11 @@ struct heap
         return result;
     }
 
+    bool empty()
+    {
+        return small.empty() && big.empty();
+    }
+
 private:
     void small_add(Key k, Value v)
     {

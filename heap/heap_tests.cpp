@@ -27,8 +27,9 @@ TEST(small, random)
     }
 
     std::vector<std::pair<std::uint64_t, std::uint64_t>> sorted;
-    for (std::size_t i = 0; i < elements; ++i)
+    while (!heap.empty())
         sorted.push_back(heap.remove_min());
+    EXPECT_EQ(sorted.size(), elements);
     EXPECT_TRUE(std::is_sorted(sorted.begin(), sorted.end()));
 }
 
