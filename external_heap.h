@@ -65,6 +65,7 @@ private:
         {
             auto max = small.back();
             small.pop_back();
+            small_max = max.first;
             big_add(max.first, max.second);
         }
 
