@@ -32,7 +32,7 @@ template <typename Key, typename Value>
 struct heap
 {
     heap(Key small_max, std::size_t t)
-        : small_size(t)
+        : small_size(2 * t)
         , small_max(small_max)
         , big(storage, t)
     {}
