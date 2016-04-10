@@ -41,8 +41,8 @@ struct heap
     {
         if (k < small_max)
             small_add(k, v);
-
-        big_add(k, v);
+        else
+            big_add(k, v);
     }
 
     std::pair<Key, Value> remove_min()
