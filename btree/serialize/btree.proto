@@ -1,0 +1,25 @@
+package btree;
+
+message KV {
+    required uint64 key = 1;
+    required uint64 value = 2;
+}
+
+message BLeaf {
+    required uint64 id = 1;
+    optional uint64 parent_id = 2;
+    required uint64 level = 3;
+
+    repeated KV value = 4;
+}
+
+message BBuffer {
+    required uint64 id = 1;
+    optional uint64 parent_id = 2;
+    required uint64 level = 3;
+
+    repeated uint64 key = 4;
+    repeated uint64 child = 5;
+
+    repeated KV pending = 6;
+}

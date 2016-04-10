@@ -15,6 +15,7 @@ set(STORAGE_SRC
 set(BTREE_SRC
     btree/btree_data.h
     btree/btree.h
+    btree/serialize/btree.pb.cc
 )
 
 add_executable(test_btree
@@ -22,7 +23,7 @@ add_executable(test_btree
     btree/btree_tests.cpp
 )
 
-target_link_libraries(test_btree ${GTEST_LIBRARY})
+target_link_libraries(test_btree ${GTEST_LIBRARY} protobuf)
 
 set(HEAP_SRC
     external_heap.h
@@ -30,4 +31,4 @@ set(HEAP_SRC
 
 add_executable(test_heap ${HEAP_SRC} ${BTREE_SRC} ${STORAGE_SRC} main.cpp)
 
-target_link_libraries(test_heap ${GTEST_LIBRARY})
+target_link_libraries(test_heap ${GTEST_LIBRARY} protobuf)
