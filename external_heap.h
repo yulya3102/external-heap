@@ -11,6 +11,7 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
+#include <limits>
 
 namespace details
 {
@@ -31,7 +32,7 @@ namespace data
 template <typename Key, typename Value>
 struct heap
 {
-    heap(Key small_max, std::size_t t)
+    heap(std::size_t t, Key small_max = std::numeric_limits<Key>::max())
         : small_size(2 * t)
         , small_max(small_max)
         , big(storage, t)
