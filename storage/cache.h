@@ -23,10 +23,10 @@ struct cache
         , cache_limit(cache_limit)
     {}
 
-    std::shared_ptr<Node> new_node(std::function<Node *(node_id)> construct)
+    std::shared_ptr<Node> new_node(std::function<Node *(node_id, cache &)> construct)
     {
         node_id id = storage_.new_node();
-        std::shared_ptr<Node> node(construct(id));
+        std::shared_ptr<Node> node(construct(id, *this));
         cached_nodes.emplace(id, node);
         recently_used(id);
         return node;
