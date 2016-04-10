@@ -665,11 +665,18 @@ template <typename Key, typename Value, typename Serialized = detail::b_node_dat
 struct b_tree
 {
     using data = detail::b_node_data<Key, Value>;
+    using serializer_t = std::function<Serialized *(data *)>;
+    using deserializer_t = std::function<data *(Serialized *)>;
 
     b_tree(storage::memory<Serialized> & storage,
            std::size_t t,
-           boost::optional<storage::node_id> root = boost::none)
-        : nodes_(storage, detail::node_constructor<Key, Value, Serialized>)
+           boost::optional<storage::node_id> root = boost::none,
+           serializer_t serializer = [] (data * d) -> data * { return d; },
+           deserializer_t deserializer = [] (data * d) -> data * { return d; })
+        : nodes_(storage,
+                 [deserializer] (Serialized * d, storage::cache<detail::b_node<Key, Value, Serialized>, Serialized> & cache)
+                 { return detail::node_constructor<Key, Value, Serialized>(deserializer(d), cache); },
+                 serializer)
         , t_(t)
         , root_(root)
     {}

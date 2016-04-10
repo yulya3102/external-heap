@@ -13,10 +13,12 @@ template <typename Node, typename Stored>
 struct cache
 {
     using constructor_t = std::function<Node *(Stored *, cache &)>;
+    using serializer_t = std::function<Stored *(Node *)>;
 
-    cache(memory<Stored> & storage, constructor_t constructor)
+    cache(memory<Stored> & storage, constructor_t constructor, serializer_t serializer)
         : storage_(storage)
         , constructor(constructor)
+        , serializer(serializer)
     {}
 
     std::shared_ptr<Node> new_node(std::function<Node *(node_id)> construct)
@@ -46,7 +48,10 @@ struct cache
     void flush()
     {
         for (auto node : cached_nodes)
-            storage_.write_node(node.first, node.second.get());
+        {
+            std::shared_ptr<Stored> serialized(serializer(node.second.get()));
+            storage_.write_node(node.first, serialized.get());
+        }
     }
 
     ~cache()
@@ -70,6 +75,7 @@ private:
 
     memory<Stored> & storage_;
     constructor_t constructor;
+    serializer_t serializer;
     using cached_node = std::pair<node_id, std::shared_ptr<Node>>;
     std::list<cached_node> cached_nodes;
 };
