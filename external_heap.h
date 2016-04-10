@@ -48,7 +48,7 @@ struct heap
         {
             auto out = std::back_inserter(small);
             big.remove_left_leaf(out);
-            small_max = small.back();
+            small_max = small.back().first;
         }
 
         auto result = small.front();
@@ -68,7 +68,7 @@ private:
                 small.pop_back();
             }
 
-            small_max = small.back();
+            small_max = small.back().first;
         }
 
         auto x = std::make_pair(k, v);
