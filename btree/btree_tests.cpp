@@ -1,6 +1,7 @@
 #include "btree.h"
 
 #include <storage/memory.h>
+#include <storage/directory.h>
 
 #include <gtest/gtest.h>
 #include <iterator>
@@ -38,7 +39,7 @@ TEST(btree, init)
 
 TEST(btree, repeating)
 {
-    storage::memory<std::string> mem;
+    storage::directory<std::string> mem("storage");
     bptree::b_tree<std::uint64_t, std::uint64_t> tree(mem, 3);
 
     std::default_random_engine generator;

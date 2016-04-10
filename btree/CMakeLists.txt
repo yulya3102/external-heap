@@ -15,4 +15,8 @@ target_link_libraries(btree INTERFACE btree_serialize)
 add_executable(test_btree
     btree_tests.cpp
 )
-target_link_libraries(test_btree storage btree ${GTEST_LIBRARY})
+target_link_libraries(test_btree storage btree
+    ${GTEST_LIBRARY}
+    ${Boost_FILESYSTEM_LIBRARY}
+    ${Boost_SYSTEM_LIBRARY}
+)
