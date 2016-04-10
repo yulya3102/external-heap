@@ -4,5 +4,5 @@ add_custom_command(
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/btree.proto
 )
 
-add_library(btree_serialize btree.pb.cc)
-target_link_libraries(btree_serialize protobuf)
+add_library(btree_proto btree.pb.cc)
+target_link_libraries(btree_proto protobuf)
