@@ -20,7 +20,7 @@ std::vector<std::pair<K, V>> from_tree(bptree::b_tree<K, V, Serialized> & tree)
 
 TEST(btree, init)
 {
-    storage::memory<detail::b_node_data<int, int>> mem;
+    storage::memory<detail::b_node_data<int, int>> mem([] (auto x) { return x->copy_data(); });
     bptree::b_tree<int, int> tree(mem, 3);
     for (size_t i = 0; i < 10; ++i)
         tree.add(i, i);
@@ -36,7 +36,7 @@ TEST(btree, init)
 
 TEST(btree, repeating)
 {
-    storage::memory<detail::b_node_data<int, std::string>> mem;
+    storage::memory<detail::b_node_data<int, std::string>> mem([] (auto x) { return x->copy_data(); });
     bptree::b_tree<int, std::string> tree(mem, 3);
 
     std::default_random_engine generator;
@@ -73,7 +73,7 @@ TEST(btree, repeating)
 
 TEST(btree, random)
 {
-    storage::memory<detail::b_node_data<int, std::string>> mem;
+    storage::memory<detail::b_node_data<int, std::string>> mem([] (auto x) { return x->copy_data(); });
     bptree::b_tree<int, std::string> tree(mem, 5);
     std::vector<std::pair<int, std::string> > src, dest;
 
@@ -106,7 +106,7 @@ TEST(btree, independent)
     std::uniform_int_distribution<std::int64_t> distribution(1, 1000);
     std::function<int()> random = std::bind(distribution, generator);
 
-    storage::memory<detail::b_node_data<int, int>> mem1;
+    storage::memory<detail::b_node_data<int, int>> mem1([] (auto x) { return x->copy_data(); });
     bptree::b_tree<int, int> tree1(mem1, 6);
     std::size_t size1 = random() * 100;
     for (std::size_t i = 0; i < size1; ++i)

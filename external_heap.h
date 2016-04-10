@@ -17,6 +17,7 @@ struct heap
     heap(std::size_t t, Key small_max = std::numeric_limits<Key>::max())
         : small_size(2 * t)
         , small_max(small_max)
+        , storage([] (auto x) { return x->copy_data(); })
         , big(storage, t)
     {}
 
