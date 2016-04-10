@@ -41,6 +41,16 @@ struct b_leaf_data : virtual b_node_data<Key, Value>
 {
     std::vector<std::pair<Key, Value>> values_;
 
+    b_leaf_data(const storage::node_id & id,
+                const boost::optional<storage::node_id> & parent,
+                std::size_t level,
+                const std::vector<std::pair<Key, Value>> & values)
+        : b_node_data<Key, Value>(id, parent, level)
+        , values_(values)
+    {}
+
+    b_leaf_data() {}
+
     virtual b_leaf_data * copy_data() const
     {
         return new b_leaf_data(*this);
@@ -52,12 +62,33 @@ struct b_internal_data : virtual b_node_data<Key, Value>
 {
     std::vector<Key> keys_;
     std::vector<storage::node_id> children_;
+
+    b_internal_data(const std::vector<Key> & keys,
+                    const std::vector<storage::node_id> & children)
+        : keys_(keys)
+        , children_(children)
+    {}
+
+    b_internal_data() {}
 };
 
 template <typename Key, typename Value>
 struct b_buffer_data : virtual b_internal_data<Key, Value>
 {
     std::queue<std::pair<Key, Value> > pending_add_;
+
+    b_buffer_data(const storage::node_id & id,
+                  const boost::optional<storage::node_id> & parent,
+                  std::size_t level,
+                  const std::vector<Key> & keys,
+                  const std::vector<storage::node_id> & children,
+                  const std::queue<std::pair<Key, Value>> & pending)
+        : b_node_data<Key, Value>(id, parent, level)
+        , b_internal_data<Key, Value>(keys, children)
+        , pending_add_(pending)
+    {}
+
+    b_buffer_data() {}
 
     virtual b_buffer_data * copy_data() const
     {
