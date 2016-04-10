@@ -40,6 +40,8 @@ struct directory : basic_storage<Serialized>
     virtual std::shared_ptr<Serialized> load_node(const node_id & id) const
     {
         fs::path node = node_path(id);
+        if (!fs::exists(node))
+            throw std::runtime_error("Trying to load missing node with index " + id);
         std::ifstream in(node.string(), std::ios_base::binary);
         std::string * data = new std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
         return std::shared_ptr<Serialized>(data);
