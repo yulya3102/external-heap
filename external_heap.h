@@ -65,10 +65,14 @@ private:
     {
         if (small.size() == small_size)
         {
-            auto max = small.back();
-            small.pop_back();
-            small_max = max.first;
-            big_add(max.first, max.second);
+            for (size_t i = 0; i < small_size / 2; ++i)
+            {
+                auto max = small.back();
+                big_add(max.first, max.second);
+                small.pop_back();
+            }
+
+            small_max = small.back();
         }
 
         auto x = std::make_pair(k, v);
