@@ -1,6 +1,6 @@
 #pragma once
 
-#include "memory.h"
+#include "basic_storage.h"
 
 #include <memory>
 #include <list>
@@ -15,7 +15,7 @@ struct cache
     using constructor_t = std::function<Node *(Stored *, cache &)>;
     using serializer_t = std::function<Stored *(Node *)>;
 
-    cache(memory<Stored> & storage, constructor_t constructor, serializer_t serializer)
+    cache(basic_storage<Stored> & storage, constructor_t constructor, serializer_t serializer)
         : storage_(storage)
         , constructor(constructor)
         , serializer(serializer)
@@ -73,7 +73,7 @@ private:
         storage_.write_node(id, node);
     }
 
-    memory<Stored> & storage_;
+    basic_storage<Stored> & storage_;
     constructor_t constructor;
     serializer_t serializer;
     using cached_node = std::pair<node_id, std::shared_ptr<Node>>;

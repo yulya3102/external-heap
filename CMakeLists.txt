@@ -10,6 +10,7 @@ find_package(GTest REQUIRED)
 add_subdirectory(btree)
 
 set(STORAGE_SRC
+    storage/basic_storage.h
     storage/memory.h
     storage/cache.h
 )

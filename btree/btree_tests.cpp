@@ -1,5 +1,7 @@
 #include "btree.h"
 
+#include <storage/memory.h>
+
 #include <gtest/gtest.h>
 #include <iterator>
 #include <iostream>

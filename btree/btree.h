@@ -669,7 +669,7 @@ struct b_tree
     using serializer_t = std::function<Serialized *(data *)>;
     using deserializer_t = std::function<data *(Serialized *)>;
 
-    b_tree(storage::memory<Serialized> & storage,
+    b_tree(storage::basic_storage<Serialized> & storage,
            std::size_t t,
            boost::optional<storage::node_id> root = boost::none,
            serializer_t serializer = bptree::serialize,
