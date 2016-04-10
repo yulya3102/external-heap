@@ -645,7 +645,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
 };
 
 template <typename Key, typename Value, typename Serialized>
-b_node<Key, Value, Serialized> * node_constructor(b_node_data<Key, Value> * data, storage::cache<b_node<Key, Value, Serialized>, b_node_data<Key, Value>> & cache)
+b_node<Key, Value, Serialized> * node_constructor(b_node_data<Key, Value> * data, storage::cache<b_node<Key, Value, Serialized>, Serialized> & cache)
 {
     if (b_leaf_data<Key, Value> * leaf_data
         = dynamic_cast<b_leaf_data<Key, Value> *>(data))
