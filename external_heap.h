@@ -52,6 +52,7 @@ struct heap
         {
             auto out = std::back_inserter(small);
             big.remove_left_leaf(out);
+            small_max = small.back();
         }
 
         auto result = small.front();
