@@ -105,7 +105,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value, Serialized>>, vi
 
     // Make correct links from (maybe new) parent to the node and its new right brother
     // and update all parent links and root link if necessary
-    void update_parent(b_node_ptr new_brother, boost::optional<storage::node_id> & tree_root)
+    void update_parent(storage::node_id new_brother, boost::optional<storage::node_id> & tree_root)
     {
         // Replace link from parent to old child with two links:
         // to old child and to new child
@@ -117,7 +117,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value, Serialized>>, vi
                 it = parent()->children_.erase(it);
             // *it == element after this
             // insert before it
-            it = parent()->children_.insert(it, new_brother->id_);
+            it = parent()->children_.insert(it, this->storage_[new_brother]->id_);
             // *it == new_brother
             // insert before it
             it = parent()->children_.insert(it, this->id_);
@@ -133,7 +133,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value, Serialized>>, vi
 
         // Update old child and new child parent links
         this->parent_ = parent()->id_;
-        new_brother->parent_ = parent()->id_;
+        this->storage_[new_brother]->parent_ = parent()->id_;
     }
 
     // Try to add pair(key, value) to the tree.
@@ -201,7 +201,10 @@ struct b_leaf : b_node<Key, Value, Serialized>, b_leaf_data<Key, Value>
         }
 
         if (!this->parent())
+        {
             this->parent_ = b_buffer<Key, Value, Serialized>::new_node(this->storage_, this->level_ + 1)->id_;
+            tree_root = this->parent_;
+        }
         b_leaf_ptr brother = std::dynamic_pointer_cast<b_leaf>(this->storage_[this->new_brother()]);
 
         auto split_by_it = this->values_.begin();
@@ -222,7 +225,7 @@ struct b_leaf : b_node<Key, Value, Serialized>, b_leaf_data<Key, Value>
 
         // Make correct links from parent to the node and its new brother
         // and update all parent links
-        this->update_parent(brother, tree_root);
+        this->update_parent(brother->id_, tree_root);
 
         return { result_tag::RESULT, this->parent() };
     }
@@ -261,8 +264,7 @@ struct b_leaf : b_node<Key, Value, Serialized>, b_leaf_data<Key, Value>
                 tree_root = this->parent()->children_.front();
                 this->storage_.delete_node(this->parent()->id_);
 
-                b_node_ptr root = this->storage_[*tree_root];
-                root->parent_ = boost::none;
+                this->storage_[*tree_root]->parent_ = boost::none;
             }
         }
         else
@@ -328,7 +330,10 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
         }
 
         if (!this->parent())
+        {
             this->parent_ = b_buffer<Key, Value, Serialized>::new_node(this->storage_, this->level_ + 1)->id_;
+            tree_root = this->parent_;
+        }
         storage::node_id brother = this->new_brother();
 
         auto split_keys = this->keys_.begin() + (t - 1);
@@ -345,8 +350,8 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
         for (auto it_children = split_children; it_children != this->children_.end(); ++it_children)
         {
             this->buffer(brother)->children_.push_back(std::move(*it_children));
-            b_node_ptr child = this->storage_[this->buffer(brother)->children_.back()];
-            child->parent_ = this->storage_[brother]->id_;
+            storage::node_id child = this->buffer(brother)->children_.back();
+            this->storage_[child]->parent_ = this->storage_[brother]->id_;
         }
 
         this->keys_.erase(split_keys, this->keys_.end());
@@ -354,7 +359,7 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
 
         // Make correct links from parent to the node and its new brother
         // and update all parent links
-        this->update_parent(this->storage_[brother], tree_root);
+        this->update_parent(brother, tree_root);
 
         return { result_tag::RESULT, this->parent() };
     }
@@ -369,9 +374,9 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
 
         auto it = std::lower_bound(this->keys_.begin(), this->keys_.end(), key);
         std::size_t i = it - this->keys_.begin();
-        b_node_ptr child = this->storage_[this->children_[i]];
+        storage::node_id child = this->children_[i];
 
-        r = child->add(std::move(key), std::move(value), t, tree_root);
+        r = this->storage_[child]->add(std::move(key), std::move(value), t, tree_root);
         if (!r)
             return boost::none;
 
@@ -381,20 +386,19 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
         return this->add(std::move(key), std::move(value), t, tree_root);
     }
 
-    void merge_with_right_brother(std::size_t i, b_internal_ptr right_brother, std::size_t t, boost::optional<storage::node_id> & tree_root)
+    void merge_with_right_brother(std::size_t i, storage::node_id right_brother, std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        assert(this->parent_ == right_brother->parent_);
+        assert(this->parent_ == this->storage_[right_brother]->parent_);
 
         assert(this->parent()->children_[i] == this->id_);
         assert(!this->parent()->parent_ || this->parent()->size() > t - 1);
 
         // Move children from right brother to the node
-        for (auto child_it = right_brother->children_.begin();
-             child_it != right_brother->children_.end();
+        for (auto child_it = this->buffer(right_brother)->children_.begin();
+             child_it != this->buffer(right_brother)->children_.end();
              ++child_it)
         {
-            b_node_ptr child = this->storage_[*child_it];
-            child->parent_ = this->id_;
+            this->storage_[*child_it]->parent_ = this->id_;
             this->children_.push_back(std::move(*child_it));
         }
 
@@ -403,8 +407,8 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
         this->parent()->keys_.erase(this->parent()->keys_.begin() + i);
 
         // Move keys from right brother to the node
-        for (auto key_it = right_brother->keys_.begin();
-             key_it != right_brother->keys_.end();
+        for (auto key_it = this->buffer(right_brother)->keys_.begin();
+             key_it != this->buffer(right_brother)->keys_.end();
              ++key_it)
             this->keys_.push_back(std::move(*key_it));
 
@@ -431,18 +435,18 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
         if (i + 1 > this->parent()->size())
             return {result_tag::RESULT, nullptr};
 
-        b_buffer_ptr right_brother = this->buffer(this->parent()->children_[i + 1]);
-        if (right_brother->pending_add_.empty())
-            return {result_tag::RESULT, right_brother};
+        storage::node_id right_brother = this->parent()->children_[i + 1];
+        if (this->buffer(right_brother)->pending_add_.empty())
+            return {result_tag::RESULT, this->buffer(right_brother)};
 
         // right brother may want to split, so
         // parent should have < 2 * t - 1 keys
         assert(this->parent()->size() < 2 * t - 1);
-        auto r = right_brother->flush(t, tree_root);
+        auto r = this->buffer(right_brother)->flush(t, tree_root);
         if (r)
             return {result_tag::CONTINUE_FROM, *r};
 
-        return {result_tag::RESULT, right_brother};
+        return {result_tag::RESULT, this->buffer(right_brother)};
     }
 
     // Ensure this node has enough keys (and children) to safely delete one
@@ -465,22 +469,19 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
             if (changed_subtree.first == result_tag::CONTINUE_FROM)
                 return changed_subtree.second;
 
-            b_internal_ptr right_brother = changed_subtree.second;
+            storage::node_id right_brother = changed_subtree.second->id_;
 
-            if (right_brother->keys_.size() >= t)
+            if (this->buffer(right_brother)->keys_.size() >= t)
             {
                 // Move left child from right brother to the node
-                this->children_.push_back(std::move(right_brother->children_.front()));
-                right_brother->children_.erase(right_brother->children_.begin());
-                {
-                    b_node_ptr child = this->storage_[this->children_.back()];
-                    child->parent_ = this->id_;
-                }
+                this->children_.push_back(std::move(this->buffer(right_brother)->children_.front()));
+                this->buffer(right_brother)->children_.erase(this->buffer(right_brother)->children_.begin());
+                    this->storage_[this->children_.back()]->parent_ = this->id_;
 
                 // Update keys
                 this->keys_.push_back(std::move(this->parent()->keys_[i]));
-                this->parent()->keys_[i] = right_brother->keys_.front();
-                right_brother->keys_.erase(right_brother->keys_.begin());
+                this->parent()->keys_[i] = this->buffer(right_brother)->keys_.front();
+                this->buffer(right_brother)->keys_.erase(this->buffer(right_brother)->keys_.begin());
             }
             else
             {
@@ -491,27 +492,24 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
                 this->merge_with_right_brother(i, right_brother, t, tree_root);
 
                 // Delete right brother
-                this->storage_.delete_node(right_brother->id_);
+                this->storage_.delete_node(right_brother);
             }
         }
         else
         {
-            b_buffer_ptr left_brother = this->buffer(this->parent()->children_[i - 1]);
+            storage::node_id left_brother = this->parent()->children_[i - 1];
 
-            if (left_brother->keys_.size() >= t)
+            if (this->buffer(left_brother)->keys_.size() >= t)
             {
                 // Move right child from left brother to the node
-                this->children_.insert(this->children_.begin(), std::move(left_brother->children_.back()));
-                left_brother->children_.pop_back();
-                {
-                    b_node_ptr child = this->storage_[this->children_.front()];
-                    child->parent_ = this->id_;
-                }
+                this->children_.insert(this->children_.begin(), std::move(this->buffer(left_brother)->children_.back()));
+                this->buffer(left_brother)->children_.pop_back();
+                    this->storage_[this->children_.front()]->parent_ = this->id_;
 
                 // Update keys
                 this->keys_.insert(this->keys_.begin(), std::move(this->parent()->keys_[i - 1]));
-                this->parent()->keys_[i - 1] = left_brother->keys_.back();
-                left_brother->keys_.pop_back();
+                this->parent()->keys_[i - 1] = this->buffer(left_brother)->keys_.back();
+                this->buffer(left_brother)->keys_.pop_back();
             }
             else
             {
@@ -519,16 +517,15 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
                 if (r)
                     return r;
 
-                left_brother->merge_with_right_brother(
-                            i - 1,
-                            std::dynamic_pointer_cast<b_internal>(this->shared_from_this()),
-                            t,
-                            tree_root);
+                this->buffer(left_brother)->merge_with_right_brother(i - 1, this->id_, t, tree_root);
 
                 // Delete right brother
                 this->storage_.delete_node(this->id_);
             }
         }
+
+        if (!this->parent_)
+            return this->buffer(this->id_);
 
         return this->parent();
     }
@@ -619,7 +616,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
         // r.first == result_tag::RESULT
         // it means there were no higher-level splits
 
-        this->parent_ = r.second->id_;
+        assert(this->parent_ == r.second->id_);
 
         std::queue<std::pair<Key, Value>> keep_pending;
         while (!this->pending_add_.empty())
