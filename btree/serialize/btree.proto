@@ -23,3 +23,8 @@ message BBuffer {
 
     repeated KV pending = 6;
 }
+
+message BNode {
+    optional BLeaf leaf = 1;
+    optional BBuffer buffer = 2;
+}
