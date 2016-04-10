@@ -9,20 +9,6 @@
 #include <utility>
 #include <limits>
 
-namespace details
-{
-    struct options_t
-    {
-        options_t(size_t block_size = 4096,
-                  size_t small_storage_blocks = 4);
-
-        size_t block_size,
-               element_size,
-               small_storage_size,
-               small_storage_elements;
-    };
-}
-
 namespace data
 {
 template <typename Key, typename Value>
