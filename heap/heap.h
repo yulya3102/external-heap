@@ -1,7 +1,7 @@
 #pragma once
 
 #include <btree/btree.h>
-#include <storage/memory.h>
+#include <storage/directory.h>
 #include <utils/undefined.h>
 
 #include <vector>
@@ -17,6 +17,7 @@ struct heap
     heap(std::size_t t, Key small_max = std::numeric_limits<Key>::max())
         : small_size(2 * t)
         , small_max(small_max)
+        , storage("storage")
         , big(storage, t)
     {}
 
@@ -74,7 +75,7 @@ private:
     std::size_t small_size;
     Key small_max;
     std::list<std::pair<Key, Value>> small;
-    storage::memory<std::string> storage;
+    storage::directory<std::string> storage;
     bptree::b_tree<Key, Value> big;
 };
 }

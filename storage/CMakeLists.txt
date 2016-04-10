@@ -7,4 +7,8 @@ target_sources(storage INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/cache.h
 )
 
-target_include_directories(storage INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_include_directories(storage INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${Boost_FILESYSTEM_LIBRARY}
+    ${Boost_SYSTEM_LIBRARY}
+)

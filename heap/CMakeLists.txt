@@ -7,4 +7,8 @@ target_include_directories(heap INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 add_executable(test_heap
     heap_tests.cpp
 )
-target_link_libraries(test_heap storage btree heap ${GTEST_LIBRARY})
+target_link_libraries(test_heap storage btree heap
+    ${GTEST_LIBRARY}
+    ${Boost_FILESYSTEM_LIBRARY}
+    ${Boost_SYSTEM_LIBRARY}
+)
