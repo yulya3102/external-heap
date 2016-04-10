@@ -21,23 +21,23 @@ enum struct result_tag
     CONTINUE_FROM
 };
 
-template <typename Key, typename Value>
+template <typename Key, typename Value, typename Serialized>
 struct b_internal;
 
-template <typename Key, typename Value>
+template <typename Key, typename Value, typename Serialized>
 struct b_buffer;
 
-template <typename Key, typename Value>
+template <typename Key, typename Value, typename Serialized>
 struct b_leaf;
 
-template <typename Key, typename Value>
-struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_node_data<Key, Value>
+template <typename Key, typename Value, typename Serialized>
+struct b_node : std::enable_shared_from_this<b_node<Key, Value, Serialized>>, virtual b_node_data<Key, Value>
 {
     using b_node_ptr = std::shared_ptr<b_node>;
-    using b_internal_ptr = std::shared_ptr<b_internal<Key, Value> >;
-    using b_buffer_ptr = std::shared_ptr<b_buffer<Key, Value> >;
-    using b_leaf_ptr = std::shared_ptr<b_leaf<Key, Value> >;
-    using cache_t = storage::cache<b_node, b_node_data<Key, Value>>;
+    using b_internal_ptr = std::shared_ptr<b_internal<Key, Value, Serialized>>;
+    using b_buffer_ptr = std::shared_ptr<b_buffer<Key, Value, Serialized>>;
+    using b_leaf_ptr = std::shared_ptr<b_leaf<Key, Value, Serialized>>;
+    using cache_t = storage::cache<b_node, Serialized>;
 
     virtual std::size_t size() const = 0;
     virtual b_node * copy(cache_t & cache) const = 0;
@@ -65,7 +65,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
     b_buffer_ptr load_parent() const
     {
         if (this->parent_)
-            return std::dynamic_pointer_cast<b_buffer<Key, Value> >(storage_[*this->parent_]);
+            return std::dynamic_pointer_cast<b_buffer<Key, Value, Serialized> >(storage_[*this->parent_]);
         return nullptr;
     }
 
@@ -132,29 +132,29 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root) = 0;
 };
 
-template <typename Key, typename Value>
-struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
+template <typename Key, typename Value, typename Serialized>
+struct b_leaf : b_node<Key, Value, Serialized>, b_leaf_data<Key, Value>
 {
-    using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
-    using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
-    using b_leaf_ptr = typename b_node<Key, Value>::b_leaf_ptr;
-    using b_buffer_ptr = typename b_node<Key, Value>::b_buffer_ptr;
-    using cache_t = typename b_node<Key, Value>::cache_t;
+    using b_internal_ptr = typename b_node<Key, Value, Serialized>::b_internal_ptr;
+    using b_node_ptr = typename b_node<Key, Value, Serialized>::b_node_ptr;
+    using b_leaf_ptr = typename b_node<Key, Value, Serialized>::b_leaf_ptr;
+    using b_buffer_ptr = typename b_node<Key, Value, Serialized>::b_buffer_ptr;
+    using cache_t = typename b_node<Key, Value, Serialized>::cache_t;
 
     b_leaf(cache_t & storage, const storage::node_id & id)
         : b_node_data<Key, Value>(id, boost::none, 0)
-        , b_node<Key, Value>(storage, id, 0)
+        , b_node<Key, Value, Serialized>(storage, id, 0)
     {}
 
     b_leaf(const b_leaf & other, cache_t & storage)
         : b_node_data<Key, Value>(other)
-        , b_node<Key, Value>(other, storage)
+        , b_node<Key, Value, Serialized>(other, storage)
         , b_leaf_data<Key, Value>(other)
     {}
 
     b_leaf(b_leaf_data<Key, Value> && data, cache_t & cache)
         : b_node_data<Key, Value>(data)
-        , b_node<Key, Value>(static_cast<b_node_data<Key, Value> &&>(data), cache)
+        , b_node<Key, Value, Serialized>(static_cast<b_node_data<Key, Value> &&>(data), cache)
         , b_leaf_data<Key, Value>(data)
     {}
 
@@ -188,7 +188,7 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
         }
 
         if (!parent)
-            parent = b_buffer<Key, Value>::new_node(this->storage_, this->level_ + 1);
+            parent = b_buffer<Key, Value, Serialized>::new_node(this->storage_, this->level_ + 1);
         b_leaf_ptr brother = std::dynamic_pointer_cast<b_leaf>(this->new_brother());
 
         auto split_by_it = this->values_.begin();
@@ -275,27 +275,27 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
     }
 };
 
-template <typename Key, typename Value>
-struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
+template <typename Key, typename Value, typename Serialized>
+struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key, Value>
 {
-    using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
-    using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
-    using b_buffer_ptr = typename b_node<Key, Value>::b_buffer_ptr;
-    using cache_t = typename b_node<Key, Value>::cache_t;
+    using b_internal_ptr = typename b_node<Key, Value, Serialized>::b_internal_ptr;
+    using b_node_ptr = typename b_node<Key, Value, Serialized>::b_node_ptr;
+    using b_buffer_ptr = typename b_node<Key, Value, Serialized>::b_buffer_ptr;
+    using cache_t = typename b_node<Key, Value, Serialized>::cache_t;
 
     b_internal(cache_t & storage, const storage::node_id & id, std::size_t level)
-        : b_node<Key, Value>(storage, id, level)
+        : b_node<Key, Value, Serialized>(storage, id, level)
     {}
 
     b_internal(const b_internal & other, cache_t & storage)
         : b_internal_data<Key, Value>(other)
-        , b_node<Key, Value>(other, storage)
+        , b_node<Key, Value, Serialized>(other, storage)
     {}
 
     b_internal(b_internal_data<Key, Value> && data, cache_t & cache)
         : b_node_data<Key, Value>(data)
         , b_internal_data<Key, Value>(data)
-        , b_node<Key, Value>(static_cast<b_node_data<Key, Value> &&>(data), cache)
+        , b_node<Key, Value, Serialized>(static_cast<b_node_data<Key, Value> &&>(data), cache)
     {}
 
     virtual std::size_t size() const
@@ -317,7 +317,7 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
         }
 
         if (!parent)
-            parent = b_buffer<Key, Value>::new_node(this->storage_, this->level_ + 1);
+            parent = b_buffer<Key, Value, Serialized>::new_node(this->storage_, this->level_ + 1);
         b_internal_ptr brother = std::dynamic_pointer_cast<b_internal>(this->new_brother());
 
         auto split_keys = this->keys_.begin() + (t - 1);
@@ -421,7 +421,7 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
         if (i + 1 > parent->size())
             return {result_tag::RESULT, nullptr};
 
-        b_buffer_ptr right_brother = std::dynamic_pointer_cast<b_buffer<Key, Value> >(this->storage_[parent->children_[i + 1]]);
+        b_buffer_ptr right_brother = std::dynamic_pointer_cast<b_buffer<Key, Value, Serialized> >(this->storage_[parent->children_[i + 1]]);
         if (right_brother->pending_add_.empty())
             return {result_tag::RESULT, right_brother};
 
@@ -533,30 +533,30 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
     }
 };
 
-template <typename Key, typename Value>
-struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
+template <typename Key, typename Value, typename Serialized>
+struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
 {
-    using b_buffer_ptr = typename b_node<Key, Value>::b_buffer_ptr;
-    using b_internal_ptr = typename b_node<Key, Value>::b_internal_ptr;
-    using b_node_ptr = typename b_node<Key, Value>::b_node_ptr;
-    using cache_t = typename b_node<Key, Value>::cache_t;
+    using b_buffer_ptr = typename b_node<Key, Value, Serialized>::b_buffer_ptr;
+    using b_internal_ptr = typename b_node<Key, Value, Serialized>::b_internal_ptr;
+    using b_node_ptr = typename b_node<Key, Value, Serialized>::b_node_ptr;
+    using cache_t = typename b_node<Key, Value, Serialized>::cache_t;
 
     b_buffer(cache_t & storage, const storage::node_id & id, std::size_t level)
         : b_node_data<Key, Value>{id, boost::none, level}
-        , b_internal<Key, Value>(storage, id, level)
+        , b_internal<Key, Value, Serialized>(storage, id, level)
     {}
 
     b_buffer(const b_buffer & other, cache_t & storage)
         : b_node_data<Key, Value>(other)
         , b_internal_data<Key, Value>(other)
-        , b_internal<Key, Value>(other, storage)
+        , b_internal<Key, Value, Serialized>(other, storage)
         , b_buffer_data<Key, Value>(other)
     {}
 
     b_buffer(b_buffer_data<Key, Value> && data, cache_t & cache)
         : b_node_data<Key, Value>(data)
         , b_internal_data<Key, Value>(data)
-        , b_internal<Key, Value>(static_cast<b_internal_data<Key, Value> &&>(data), cache)
+        , b_internal<Key, Value, Serialized>(static_cast<b_internal_data<Key, Value> &&>(data), cache)
         , b_buffer_data<Key, Value>(data)
     {}
 
@@ -589,7 +589,7 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
         {
             auto x = std::move(this->pending_add_.front());
             this->pending_add_.pop();
-            boost::optional<b_buffer_ptr> r = b_internal<Key, Value>::add(std::move(x.first), std::move(x.second), t, tree_root);
+            boost::optional<b_buffer_ptr> r = b_internal<Key, Value, Serialized>::add(std::move(x.first), std::move(x.second), t, tree_root);
             if (r)
             {
                 (*r)->pending_add_.push(x);
@@ -602,7 +602,7 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
 
     virtual std::pair<result_tag, b_buffer_ptr> split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        auto r = b_internal<Key, Value>::split_full(parent, t, tree_root);
+        auto r = b_internal<Key, Value, Serialized>::split_full(parent, t, tree_root);
 
         if (r.first == result_tag::CONTINUE_FROM)
             return r;
@@ -635,25 +635,25 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
         remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root)
     {
         if (this->pending_add_.empty())
-            return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
+            return b_internal<Key, Value, Serialized>::remove_left_leaf(t, tree_root);
 
         boost::optional<b_buffer_ptr> r = this->flush(t, tree_root);
         if (r)
             return (*r)->remove_left_leaf(t, tree_root);
-        return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
+        return b_internal<Key, Value, Serialized>::remove_left_leaf(t, tree_root);
     }
 };
 
-template <typename Key, typename Value>
-b_node<Key, Value> * node_constructor(b_node_data<Key, Value> * data, storage::cache<b_node<Key, Value>, b_node_data<Key, Value>> & cache)
+template <typename Key, typename Value, typename Serialized>
+b_node<Key, Value, Serialized> * node_constructor(b_node_data<Key, Value> * data, storage::cache<b_node<Key, Value, Serialized>, b_node_data<Key, Value>> & cache)
 {
     if (b_leaf_data<Key, Value> * leaf_data
         = dynamic_cast<b_leaf_data<Key, Value> *>(data))
-        return new b_leaf<Key, Value>(std::move(*leaf_data), cache);
+        return new b_leaf<Key, Value, Serialized>(std::move(*leaf_data), cache);
 
     if (b_buffer_data<Key, Value> * buffer_data
         = dynamic_cast<b_buffer_data<Key, Value> *>(data))
-        return new b_buffer<Key, Value>(std::move(*buffer_data), cache);
+        return new b_buffer<Key, Value, Serialized>(std::move(*buffer_data), cache);
 
     throw std::logic_error("Unknown node type");
 }
@@ -661,13 +661,15 @@ b_node<Key, Value> * node_constructor(b_node_data<Key, Value> * data, storage::c
 
 namespace bptree
 {
-template <typename Key, typename Value>
+template <typename Key, typename Value, typename Serialized = detail::b_node_data<Key, Value>>
 struct b_tree
 {
-    b_tree(storage::memory<detail::b_node_data<Key, Value>> & storage,
+    using data = detail::b_node_data<Key, Value>;
+
+    b_tree(storage::memory<Serialized> & storage,
            std::size_t t,
            boost::optional<storage::node_id> root = boost::none)
-        : nodes_(storage, detail::node_constructor<Key, Value>)
+        : nodes_(storage, detail::node_constructor<Key, Value, Serialized>)
         , t_(t)
         , root_(root)
     {}
@@ -722,17 +724,17 @@ struct b_tree
     }
 
 private:
-    using b_node_ptr = typename detail::b_node<Key, Value>::b_node_ptr;
-    using b_internal_ptr = typename detail::b_node<Key, Value>::b_internal_ptr;
-    using b_leaf_ptr = typename detail::b_node<Key, Value>::b_leaf_ptr;
-    using b_buffer_ptr = typename detail::b_node<Key, Value>::b_buffer_ptr;
+    using b_node_ptr = typename detail::b_node<Key, Value, Serialized>::b_node_ptr;
+    using b_internal_ptr = typename detail::b_node<Key, Value, Serialized>::b_internal_ptr;
+    using b_leaf_ptr = typename detail::b_node<Key, Value, Serialized>::b_leaf_ptr;
+    using b_buffer_ptr = typename detail::b_node<Key, Value, Serialized>::b_buffer_ptr;
 
-    storage::cache<detail::b_node<Key, Value>, detail::b_node_data<Key, Value>> nodes_;
+    storage::cache<detail::b_node<Key, Value, Serialized>, Serialized> nodes_;
     std::size_t t_;
     boost::optional<storage::node_id> root_;
 
-    using leaf_t = detail::b_leaf<Key, Value>;
-    using internal_t = detail::b_internal<Key, Value>;
+    using leaf_t = detail::b_leaf<Key, Value, Serialized>;
+    using internal_t = detail::b_internal<Key, Value, Serialized>;
 
     bool is_leaf(b_node_ptr x)
     {

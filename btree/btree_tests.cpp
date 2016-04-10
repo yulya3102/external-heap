@@ -5,8 +5,8 @@
 #include <iostream>
 #include <functional>
 
-template <typename K, typename V>
-std::vector<std::pair<K, V>> from_tree(bptree::b_tree<K, V> & tree)
+template <typename K, typename V, typename Serialized>
+std::vector<std::pair<K, V>> from_tree(bptree::b_tree<K, V, Serialized> & tree)
 {
     std::vector<std::pair<K, V> > v;
     auto out = std::back_inserter(v);
