@@ -17,7 +17,8 @@ template <typename Serialized>
 struct directory : basic_storage<Serialized>
 {
     directory(const fs::path & storage_dir)
-        : storage_dir(storage_dir)
+        : max_id(0)
+        , storage_dir(storage_dir)
     {
         fs::create_directory(storage_dir);
 
@@ -52,11 +53,11 @@ struct directory : basic_storage<Serialized>
     virtual void write_node(const node_id & id, Serialized * node)
     {
         std::ofstream out(node_path(id).string(), std::ios_base::binary);
-        out << node;
+        out << *node;
         out.close();
     }
 
-    fs::path node_path(const node_id & id)
+    fs::path node_path(const node_id & id) const
     {
         return storage_dir / std::to_string(id);
     }
