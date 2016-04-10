@@ -59,9 +59,7 @@ detail::b_node_data<std::uint64_t, std::uint64_t> * deserialize(std::string * se
             parent = leaf.parent_id();
         std::vector<std::pair<std::uint64_t, std::uint64_t>> values;
         for (auto v : leaf.value())
-        {
-            undefined;
-        }
+            values.push_back({v.key(), v.value()});
         return new detail::b_leaf_data<std::uint64_t, std::uint64_t>(
                     leaf.id(), parent, leaf.level(), values
         );
@@ -74,19 +72,13 @@ detail::b_node_data<std::uint64_t, std::uint64_t> * deserialize(std::string * se
             parent = buffer.parent_id();
         std::vector<std::uint64_t> keys;
         for (auto k : buffer.key())
-        {
-            undefined;
-        }
+            keys.push_back(k);
         std::vector<storage::node_id> children;
         for (auto c : buffer.child())
-        {
-            undefined;
-        }
+            children.push_back(c);
         std::queue<std::pair<std::uint64_t, std::uint64_t>> pending;
         for (auto v : buffer.pending())
-        {
-            undefined;
-        }
+            pending.push({v.key(), v.value()});
         return new detail::b_buffer_data<std::uint64_t, std::uint64_t>(
                     buffer.id(), parent, buffer.level(),
                     keys, children, pending
