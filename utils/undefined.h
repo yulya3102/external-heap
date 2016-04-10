@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdexcept>
+
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #define __AT__ __FILE__ ":" TOSTRING(__LINE__)
