@@ -1,5 +1,7 @@
 #pragma once
 
+#include "btree_data.h"
+
 #include <vector>
 #include <map>
 #include <cassert>
@@ -27,33 +29,6 @@ struct b_buffer;
 
 template <typename Key, typename Value>
 struct b_leaf;
-
-template <typename Key, typename Value>
-struct b_node_data
-{
-    storage::node_id id_;
-    boost::optional<storage::node_id> parent_;
-    std::size_t level_;
-
-    b_node_data()
-    {
-        throw std::logic_error(
-            "b_node_data(): this constructor should never be called"
-        );
-    }
-
-    b_node_data(const storage::node_id & id,
-                const boost::optional<storage::node_id> & parent,
-                std::size_t level)
-        : id_(id)
-        , parent_(parent)
-        , level_(level)
-    {}
-
-    virtual b_node_data * copy_data() const = 0;
-
-    virtual ~b_node_data() = default;
-};
 
 template <typename Key, typename Value>
 struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_node_data<Key, Value>
@@ -155,17 +130,6 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
 
     // Remove left leaf from subtree and return values from it
     virtual std::vector<std::pair<Key, Value> > remove_left_leaf(std::size_t t, boost::optional<storage::node_id> & tree_root) = 0;
-};
-
-template <typename Key, typename Value>
-struct b_leaf_data : virtual b_node_data<Key, Value>
-{
-    std::vector<std::pair<Key, Value>> values_;
-
-    virtual b_leaf_data * copy_data() const
-    {
-        return new b_leaf_data(*this);
-    }
 };
 
 template <typename Key, typename Value>
@@ -309,13 +273,6 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
         this->storage_.delete_node(this->id_);
         return result;
     }
-};
-
-template <typename Key, typename Value>
-struct b_internal_data : virtual b_node_data<Key, Value>
-{
-    std::vector<Key> keys_;
-    std::vector<storage::node_id> children_;
 };
 
 template <typename Key, typename Value>
@@ -573,17 +530,6 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
     {
         return this->storage_[this->children_.front()]
                 -> remove_left_leaf(t, tree_root);
-    }
-};
-
-template <typename Key, typename Value>
-struct b_buffer_data : virtual b_internal_data<Key, Value>
-{
-    std::queue<std::pair<Key, Value> > pending_add_;
-
-    virtual b_buffer_data * copy_data() const
-    {
-        return new b_buffer_data(*this);
     }
 };
 

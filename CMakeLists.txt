@@ -22,5 +22,5 @@ set(TESTS main.cpp)
 #add_executable(test_heap ${TESTS})
 #target_link_libraries(test_heap ${GTEST_LIBRARY} external_heap ${Boost_LIBRARIES})
 
-add_executable(test_btree btree/btree.h btree/btree_tests.cpp storage/memory.h)
+add_executable(test_btree btree/btree_data.h btree/btree.h btree/btree_tests.cpp storage/memory.h)
 target_link_libraries(test_btree ${GTEST_LIBRARY})
