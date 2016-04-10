@@ -33,6 +33,8 @@ struct heap
     {
         if (small.empty())
         {
+            if (big.empty())
+                throw std::runtime_error("Trying to remove minimal element from empty heap");
             auto out = std::back_inserter(small);
             big.remove_left_leaf(out);
             small_max = small.back().first;
