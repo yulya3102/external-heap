@@ -52,14 +52,18 @@ private:
                 auto max = small.back();
                 big_add(max.first, max.second);
                 small.pop_back();
+                small_max = max.first;
             }
 
-            small_max = small.back().first;
+            // k can be > small_max now
+            add(k, v);
         }
-
-        auto x = std::make_pair(k, v);
-        auto it = std::lower_bound(small.begin(), small.end(), x);
-        small.insert(it, x);
+        else
+        {
+            auto x = std::make_pair(k, v);
+            auto it = std::lower_bound(small.begin(), small.end(), x);
+            small.insert(it, x);
+        }
     }
 
     void big_add(Key k, Value v)
