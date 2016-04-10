@@ -9,11 +9,14 @@
 
 namespace storage
 {
-template <typename Node>
+template <typename Node, typename Stored>
 struct cache
 {
-    cache(memory<Node> & storage)
+    using constructor_t = std::function<Node *(Stored *, cache &)>;
+
+    cache(memory<Stored> & storage, constructor_t constructor)
         : storage_(storage)
+        , constructor(constructor)
     {}
 
     std::shared_ptr<Node> new_node(std::function<Node *(node_id)> construct)
@@ -54,7 +57,9 @@ struct cache
 private:
     std::shared_ptr<Node> load_node(const node_id & id)
     {
-        cached_nodes.push_back({id, storage_.load_node(id)});
+        std::shared_ptr<Stored> x = storage_.load_node(id);
+        std::shared_ptr<Node> node(constructor(x.get(), *this));
+        cached_nodes.push_back({id, node});
         return cached_nodes.back().second;
     }
 
@@ -63,7 +68,8 @@ private:
         storage_.write_node(id, node);
     }
 
-    memory<Node> & storage_;
+    memory<Stored> & storage_;
+    constructor_t constructor;
     using cached_node = std::pair<node_id, std::shared_ptr<Node>>;
     std::list<cached_node> cached_nodes;
 };

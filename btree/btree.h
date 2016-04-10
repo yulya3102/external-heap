@@ -50,6 +50,8 @@ struct b_node_data
         , level_(level)
     {}
 
+    virtual b_node_data * copy_data() const = 0;
+
     virtual ~b_node_data() = default;
 };
 
@@ -60,10 +62,10 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
     using b_internal_ptr = std::shared_ptr<b_internal<Key, Value> >;
     using b_buffer_ptr = std::shared_ptr<b_buffer<Key, Value> >;
     using b_leaf_ptr = std::shared_ptr<b_leaf<Key, Value> >;
-    using cache_t = storage::cache<b_node>;
+    using cache_t = storage::cache<b_node, b_node_data<Key, Value>>;
 
     virtual std::size_t size() const = 0;
-    virtual b_node * copy(const storage::memory<b_node> & storage) const = 0;
+    virtual b_node * copy(cache_t & cache) const = 0;
     virtual b_node_ptr new_brother() const = 0;
 
     cache_t & storage_;
@@ -76,6 +78,11 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value> >, virtual b_nod
     b_node(const b_node & other, cache_t & storage)
         : b_node_data<Key, Value>{other.id_, other.parent_, other.level_}
         , storage_(storage)
+    {}
+
+    b_node(b_node_data<Key, Value> && data, cache_t & cache)
+        : b_node_data<Key, Value>(data)
+        , storage_(cache)
     {}
 
     virtual ~b_node() = default;
@@ -154,6 +161,11 @@ template <typename Key, typename Value>
 struct b_leaf_data : virtual b_node_data<Key, Value>
 {
     std::vector<std::pair<Key, Value>> values_;
+
+    virtual b_leaf_data * copy_data() const
+    {
+        return new b_leaf_data(*this);
+    }
 };
 
 template <typename Key, typename Value>
@@ -176,15 +188,21 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
         , b_leaf_data<Key, Value>(other)
     {}
 
+    b_leaf(b_leaf_data<Key, Value> && data, cache_t & cache)
+        : b_node_data<Key, Value>(data)
+        , b_node<Key, Value>(static_cast<b_node_data<Key, Value> &&>(data), cache)
+        , b_leaf_data<Key, Value>(data)
+    {}
+
     virtual std::size_t size() const
     {
         return this->values_.size();
     }
 
-    virtual b_leaf * copy(const storage::memory<b_node<Key, Value> > & storage) const
+    virtual b_leaf * copy(cache_t & cache) const
     {
-        auto cache = new cache_t(const_cast<storage::memory<b_node<Key, Value> > & >(storage));
-        return new b_leaf(*this, *cache);
+        std::shared_ptr<b_leaf_data<Key, Value>> x(b_leaf_data<Key, Value>::copy_data());
+        return new b_leaf(std::move(*x), cache);
     }
 
     virtual b_node_ptr new_brother() const
@@ -315,6 +333,12 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
     b_internal(const b_internal & other, cache_t & storage)
         : b_internal_data<Key, Value>(other)
         , b_node<Key, Value>(other, storage)
+    {}
+
+    b_internal(b_internal_data<Key, Value> && data, cache_t & cache)
+        : b_node_data<Key, Value>(data)
+        , b_internal_data<Key, Value>(data)
+        , b_node<Key, Value>(static_cast<b_node_data<Key, Value> &&>(data), cache)
     {}
 
     virtual std::size_t size() const
@@ -556,6 +580,11 @@ template <typename Key, typename Value>
 struct b_buffer_data : virtual b_internal_data<Key, Value>
 {
     std::queue<std::pair<Key, Value> > pending_add_;
+
+    virtual b_buffer_data * copy_data() const
+    {
+        return new b_buffer_data(*this);
+    }
 };
 
 template <typename Key, typename Value>
@@ -578,10 +607,17 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
         , b_buffer_data<Key, Value>(other)
     {}
 
-    virtual b_buffer * copy(const storage::memory<b_node<Key, Value> > & storage) const
+    b_buffer(b_buffer_data<Key, Value> && data, cache_t & cache)
+        : b_node_data<Key, Value>(data)
+        , b_internal_data<Key, Value>(data)
+        , b_internal<Key, Value>(static_cast<b_internal_data<Key, Value> &&>(data), cache)
+        , b_buffer_data<Key, Value>(data)
+    {}
+
+    virtual b_buffer * copy(cache_t & cache) const
     {
-        auto cache = new cache_t(const_cast<storage::memory<b_node<Key, Value> > & >(storage));
-        return new b_buffer(*this, *cache);
+        std::shared_ptr<b_buffer_data<Key, Value>> x(b_buffer_data<Key, Value>::copy_data());
+        return new b_buffer(std::move(*x), cache);
     }
 
     static b_buffer_ptr new_node(cache_t & cache, std::size_t level)
@@ -661,6 +697,20 @@ struct b_buffer : b_internal<Key, Value>, b_buffer_data<Key, Value>
         return b_internal<Key, Value>::remove_left_leaf(t, tree_root);
     }
 };
+
+template <typename Key, typename Value>
+b_node<Key, Value> * node_constructor(b_node_data<Key, Value> * data, storage::cache<b_node<Key, Value>, b_node_data<Key, Value>> & cache)
+{
+    if (b_leaf_data<Key, Value> * leaf_data
+        = dynamic_cast<b_leaf_data<Key, Value> *>(data))
+        return new b_leaf<Key, Value>(std::move(*leaf_data), cache);
+
+    if (b_buffer_data<Key, Value> * buffer_data
+        = dynamic_cast<b_buffer_data<Key, Value> *>(data))
+        return new b_buffer<Key, Value>(std::move(*buffer_data), cache);
+
+    throw std::logic_error("Unknown node type");
+}
 }
 
 namespace bptree
@@ -668,9 +718,9 @@ namespace bptree
 template <typename Key, typename Value, int t>
 struct b_tree
 {
-    b_tree(storage::memory<detail::b_node<Key, Value>> & storage,
+    b_tree(storage::memory<detail::b_node_data<Key, Value>> & storage,
            boost::optional<storage::node_id> root = boost::none)
-        : nodes_(storage)
+        : nodes_(storage, detail::node_constructor<Key, Value>)
         , root_(root)
     {}
 
@@ -729,7 +779,7 @@ private:
     using b_leaf_ptr = typename detail::b_node<Key, Value>::b_leaf_ptr;
     using b_buffer_ptr = typename detail::b_node<Key, Value>::b_buffer_ptr;
 
-    storage::cache<detail::b_node<Key, Value> > nodes_;
+    storage::cache<detail::b_node<Key, Value>, detail::b_node_data<Key, Value>> nodes_;
     boost::optional<storage::node_id> root_;
 
     using leaf_t = detail::b_leaf<Key, Value>;

@@ -15,7 +15,7 @@ struct memory
     memory(const memory<Node> & other)
     {
         for (auto & x : other.storage_)
-            storage_[x.first].reset(x.second->copy(*this));
+            storage_[x.first].reset(x.second->copy_data());
     }
 
     node_id new_node() const
@@ -26,7 +26,7 @@ struct memory
 
     std::shared_ptr<Node> load_node(const node_id & id) const
     {
-        return std::shared_ptr<Node>(storage_.at(id)->copy(*this));
+        return std::shared_ptr<Node>(storage_.at(id)->copy_data());
     }
 
     void delete_node(const node_id & id)
@@ -36,7 +36,7 @@ struct memory
 
     void write_node(const node_id & id, Node * node)
     {
-        storage_[id].reset(node->copy(*this));
+        storage_[id].reset(node->copy_data());
     }
 
 private:
