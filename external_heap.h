@@ -9,6 +9,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include <algorithm>
+#include <utility>
 
 namespace details
 {
@@ -59,7 +61,16 @@ struct heap
 private:
     void small_add(Key k, Value v)
     {
-        undefined;
+        if (small.size() == small_size)
+        {
+            auto max = small.back();
+            small.pop_back();
+            big_add(max.first, max.second);
+        }
+
+        auto x = std::make_pair(k, v);
+        auto it = std::lower_bound(small.begin(), small.end(), x);
+        small.insert(it, x);
     }
 
     void big_add(Key k, Value v)
