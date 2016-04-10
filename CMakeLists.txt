@@ -7,7 +7,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Boost REQUIRED)
 find_package(GTest REQUIRED)
 
-add_subdirectory(btree/serialize)
+add_subdirectory(btree)
 
 set(STORAGE_SRC
     storage/memory.h
