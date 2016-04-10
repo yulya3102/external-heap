@@ -36,6 +36,14 @@ std::string * serialize(detail::b_node_data<std::uint64_t, std::uint64_t> * data
             buffer->add_child(child);
         for (auto key : buffer_data->keys_)
             buffer->add_key(key);
+        while (!buffer_data->pending_add_.empty())
+        {
+            auto x = buffer_data->pending_add_.front();
+            buffer_data->pending_add_.pop();
+            btree::KV * kv = buffer->add_pending();
+            kv->set_key(x.first);
+            kv->set_value(x.second);
+        }
         node.set_allocated_buffer(buffer);
     }
     else
