@@ -70,6 +70,15 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value, Serialized>>, vi
         return nullptr;
     }
 
+    // Return index of the node in parent's 'children' array
+    std::size_t child_index() const
+    {
+        b_buffer_ptr parent = load_parent();
+
+        auto it = std::find(parent->children_.begin(), parent->children_.end(), this->id_);
+        return it - parent->children_.begin();
+    }
+
     // Split node: replace the node with its parent (or new internal node)
     // make new node (right brother) of the same type as the node
     // and make the node and its new brother children of the new internal node
@@ -609,14 +618,44 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
         if (r.first == result_tag::CONTINUE_FROM)
             return r;
 
+        // r.first == result_tag::RESULT
+        // it means there were no higher-level splits
+
         parent = std::dynamic_pointer_cast<b_buffer>(r.second);
 
+        std::queue<std::pair<Key, Value>> keep_pending;
         while (!this->pending_add_.empty())
         {
-            assert(parent->pending_add_.size() < t);
-            parent->pending_add_.push(std::move(this->pending_add_.front()));
+            auto x = this->pending_add_.front();
             this->pending_add_.pop();
+
+            std::size_t i = this->child_index();
+            Key left = std::numeric_limits<Key>::min(),
+                right = std::numeric_limits<Key>::max();
+            if (i > 0)
+                left = parent->keys_[i - 1];
+            if (i < parent->keys_.size())
+                right = parent->keys_[i];
+
+            std::pair<Key, Key> range(left, right);
+            if (x.first < range.first)
+            {
+                // push x to left brother
+                std::dynamic_pointer_cast<b_buffer>(
+                            this->storage_[parent->children_[i - 1]])
+                        ->pending_add_.push(std::move(x));
+            }
+            else if (x.first < range.second)
+                keep_pending.push(std::move(x));
+            else
+            {
+                // push x to right brother
+                std::dynamic_pointer_cast<b_buffer>(
+                            this->storage_[parent->children_[i + 1]])
+                        ->pending_add_.push(std::move(x));
+            }
         }
+        this->pending_add_.swap(keep_pending);
 
         return { result_tag::RESULT, parent };
     }
