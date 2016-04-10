@@ -4,10 +4,6 @@
 #include <storage/memory.h>
 #include <utils/undefined.h>
 
-#include <boost/optional.hpp>
-
-#include <cstddef>
-#include <cstdint>
 #include <vector>
 #include <algorithm>
 #include <utility>
