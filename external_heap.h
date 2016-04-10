@@ -1,14 +1,16 @@
 #pragma once
 
+#include <btree/btree.h>
+#include <storage/memory.h>
+#include <utils/undefined.h>
+
 #include <boost/optional.hpp>
 
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 
-#include "buffer_tree.h"
-
-struct heap_t
+namespace details
 {
     struct options_t
     {
@@ -20,12 +22,26 @@ struct heap_t
                small_storage_size,
                small_storage_elements;
     };
+}
 
-    heap_t();
-    heap_t(const options_t & options);
+namespace data
+{
+template <typename Key, typename Value>
+struct heap
+{
+    heap(std::size_t t)
+        : big_elements(storage, t)
+    {}
 
-    void add(std::int64_t x);
-    std::int64_t remove_min();
+    void add(Key k, Value v)
+    {
+        undefined;
+    }
+
+    std::pair<Key, Value> remove_min()
+    {
+        undefined;
+    }
 
 private:
     void small_add(std::int64_t x);
@@ -33,9 +49,9 @@ private:
     bool is_small(std::int64_t x);
     void update_small_max();
 
-    std::vector<std::int64_t> small_elements;
-    boost::optional<std::int64_t> small_max;
-    buffer_tree_t big_elements;
-
-    const options_t options;
+    std::list<std::pair<Key, Value>> small_elements;
+    boost::optional<Key> small_max;
+    storage::memory<detail::b_node_data<Key, Value>> storage;
+    bptree::b_tree<Key, Value> big_elements;
 };
+}

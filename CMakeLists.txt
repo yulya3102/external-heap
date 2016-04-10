@@ -24,14 +24,10 @@ add_executable(test_btree
 
 target_link_libraries(test_btree ${GTEST_LIBRARY})
 
-#set(HEAP
-    #external_heap.h external_heap.cpp
-    #buffer_tree.h   buffer_tree.cpp
-    #utils/undefined.h
-#)
+set(HEAP_SRC
+    external_heap.h
+)
 
-#add_library(external_heap SHARED ${HEAP})
+add_executable(test_heap ${HEAP_SRC} ${BTREE_SRC} ${STORAGE_SRC} main.cpp)
 
-#set(TESTS main.cpp)
-#add_executable(test_heap ${TESTS})
-#target_link_libraries(test_heap ${GTEST_LIBRARY} external_heap ${Boost_LIBRARIES})
+target_link_libraries(test_heap ${GTEST_LIBRARY})
