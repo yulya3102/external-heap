@@ -21,7 +21,10 @@ TEST(small, random)
     size_t elements = 512;
     heap.add(100, 100);
     for (std::size_t i = 1; i < elements; ++i)
-        heap.add(distribution(generator), i);
+    {
+        auto x = distribution(generator);
+        heap.add(x, x);
+    }
 
     std::vector<std::pair<int, int>> sorted;
     for (std::size_t i = 0; i < elements; ++i)
