@@ -42,7 +42,7 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value, Serialized>>, vi
 
     virtual std::size_t size() const = 0;
     virtual b_node * copy(cache_t & cache) const = 0;
-    virtual b_node_ptr new_brother() const = 0;
+    virtual storage::node_id new_brother() const = 0;
 
     cache_t & storage_;
 
@@ -63,10 +63,15 @@ struct b_node : std::enable_shared_from_this<b_node<Key, Value, Serialized>>, vi
 
     virtual ~b_node() = default;
 
+    b_buffer_ptr buffer(const storage::node_id & id) const
+    {
+        return std::dynamic_pointer_cast<b_buffer<Key, Value, Serialized>>(storage_[id]);
+    }
+
     b_buffer_ptr parent() const
     {
         if (this->parent_)
-            return std::dynamic_pointer_cast<b_buffer<Key, Value, Serialized> >(storage_[*this->parent_]);
+            return buffer(*this->parent_);
         return nullptr;
     }
 
@@ -177,9 +182,9 @@ struct b_leaf : b_node<Key, Value, Serialized>, b_leaf_data<Key, Value>
         return new b_leaf(std::move(*x), cache);
     }
 
-    virtual b_node_ptr new_brother() const
+    virtual storage::node_id new_brother() const
     {
-        return this->storage_.new_node([] (storage::node_id id, cache_t & cache) { return new b_leaf(cache, id); });
+        return this->storage_.new_node([] (storage::node_id id, cache_t & cache) { return new b_leaf(cache, id); })->id_;
     }
 
     virtual ~b_leaf() = default;
@@ -197,7 +202,7 @@ struct b_leaf : b_node<Key, Value, Serialized>, b_leaf_data<Key, Value>
 
         if (!this->parent())
             this->parent_ = b_buffer<Key, Value, Serialized>::new_node(this->storage_, this->level_ + 1)->id_;
-        b_leaf_ptr brother = std::dynamic_pointer_cast<b_leaf>(this->new_brother());
+        b_leaf_ptr brother = std::dynamic_pointer_cast<b_leaf>(this->storage_[this->new_brother()]);
 
         auto split_by_it = this->values_.begin();
         for (size_t i = 0; i < t - 1; ++i)
@@ -324,7 +329,7 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
 
         if (!this->parent())
             this->parent_ = b_buffer<Key, Value, Serialized>::new_node(this->storage_, this->level_ + 1)->id_;
-        b_internal_ptr brother = std::dynamic_pointer_cast<b_internal>(this->new_brother());
+        storage::node_id brother = this->new_brother();
 
         auto split_keys = this->keys_.begin() + (t - 1);
         auto split_children = this->children_.begin() + t;
@@ -335,13 +340,13 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
         this->parent()->keys_.insert(i_key, std::move(*split_keys));
 
         for (auto it_keys = split_keys + 1; it_keys != this->keys_.end(); ++it_keys)
-            brother->keys_.push_back(std::move(*it_keys));
+            this->buffer(brother)->keys_.push_back(std::move(*it_keys));
 
         for (auto it_children = split_children; it_children != this->children_.end(); ++it_children)
         {
-            brother->children_.push_back(std::move(*it_children));
-            b_node_ptr child = this->storage_[brother->children_.back()];
-            child->parent_ = brother->id_;
+            this->buffer(brother)->children_.push_back(std::move(*it_children));
+            b_node_ptr child = this->storage_[this->buffer(brother)->children_.back()];
+            child->parent_ = this->storage_[brother]->id_;
         }
 
         this->keys_.erase(split_keys, this->keys_.end());
@@ -349,7 +354,7 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
 
         // Make correct links from parent to the node and its new brother
         // and update all parent links
-        this->update_parent(brother, tree_root);
+        this->update_parent(this->storage_[brother], tree_root);
 
         return { result_tag::RESULT, this->parent() };
     }
@@ -426,7 +431,7 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
         if (i + 1 > this->parent()->size())
             return {result_tag::RESULT, nullptr};
 
-        b_buffer_ptr right_brother = std::dynamic_pointer_cast<b_buffer<Key, Value, Serialized> >(this->storage_[this->parent()->children_[i + 1]]);
+        b_buffer_ptr right_brother = this->buffer(this->parent()->children_[i + 1]);
         if (right_brother->pending_add_.empty())
             return {result_tag::RESULT, right_brother};
 
@@ -491,7 +496,7 @@ struct b_internal : b_node<Key, Value, Serialized>, virtual b_internal_data<Key,
         }
         else
         {
-            b_internal_ptr left_brother = std::dynamic_pointer_cast<b_internal>(this->storage_[this->parent()->children_[i - 1]]);
+            b_buffer_ptr left_brother = this->buffer(this->parent()->children_[i - 1]);
 
             if (left_brother->keys_.size() >= t)
             {
@@ -578,9 +583,9 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
                     ));
     }
 
-    virtual b_node_ptr new_brother() const
+    virtual storage::node_id new_brother() const
     {
-        return new_node(this->storage_, this->level_);
+        return new_node(this->storage_, this->level_)->id_;
     }
 
     // Try to add all elements from pending list to the tree
@@ -614,7 +619,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
         // r.first == result_tag::RESULT
         // it means there were no higher-level splits
 
-        this->parent_ = std::dynamic_pointer_cast<b_buffer>(r.second)->id_;
+        this->parent_ = r.second->id_;
 
         std::queue<std::pair<Key, Value>> keep_pending;
         while (!this->pending_add_.empty())
@@ -634,8 +639,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
             if (x.first < range.first)
             {
                 // push x to left brother
-                std::dynamic_pointer_cast<b_buffer>(
-                            this->storage_[this->parent()->children_[i - 1]])
+                this->buffer(this->parent()->children_[i - 1])
                         ->pending_add_.push(std::move(x));
             }
             else if (x.first < range.second)
@@ -643,8 +647,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
             else
             {
                 // push x to right brother
-                std::dynamic_pointer_cast<b_buffer>(
-                            this->storage_[this->parent()->children_[i + 1]])
+                this->buffer(this->parent()->children_[i + 1])
                         ->pending_add_.push(std::move(x));
             }
         }
