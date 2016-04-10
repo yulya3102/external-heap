@@ -593,6 +593,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
             boost::optional<b_buffer_ptr> r = b_internal<Key, Value, Serialized>::add(std::move(x.first), std::move(x.second), t, tree_root);
             if (r)
             {
+                assert((*r)->pending_add_.size() < t);
                 (*r)->pending_add_.push(x);
                 return r;
             }
@@ -612,6 +613,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
 
         while (!this->pending_add_.empty())
         {
+            assert(parent->pending_add_.size() < t);
             parent->pending_add_.push(std::move(this->pending_add_.front()));
             this->pending_add_.pop();
         }
