@@ -197,7 +197,13 @@ struct b_leaf : b_node<Key, Value>, b_leaf_data<Key, Value>
     virtual std::pair<result_tag, b_buffer_ptr> split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(this->size() == 2 * t - 1);
-        assert(!parent || parent->size() < 2 * t - 1);
+
+        if (parent)
+        {
+            auto r = parent->ensure_not_too_big(t, tree_root);
+            if (r)
+                return { result_tag::CONTINUE_FROM, *r };
+        }
 
         if (!parent)
             parent = b_buffer<Key, Value>::new_node(this->storage_, this->level_ + 1);
@@ -321,7 +327,13 @@ struct b_internal : b_node<Key, Value>, virtual b_internal_data<Key, Value>
     virtual std::pair<result_tag, b_buffer_ptr> split_full(b_buffer_ptr parent, size_t t, boost::optional<storage::node_id> & tree_root)
     {
         assert(this->size() == 2 * t - 1);
-        assert(!parent || parent->size() < 2 * t - 1);
+
+        if (parent)
+        {
+            auto r = parent->ensure_not_too_big(t, tree_root);
+            if (r)
+                return { result_tag::CONTINUE_FROM, *r };
+        }
 
         if (!parent)
             parent = b_buffer<Key, Value>::new_node(this->storage_, this->level_ + 1);
