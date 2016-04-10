@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <list>
+#include <unordered_map>
 #include <algorithm>
 #include <functional>
 
@@ -15,34 +16,40 @@ struct cache
     using constructor_t = std::function<Node *(Stored *, cache &)>;
     using serializer_t = std::function<Stored *(Node *)>;
 
-    cache(basic_storage<Stored> & storage, constructor_t constructor, serializer_t serializer)
+    cache(basic_storage<Stored> & storage, constructor_t constructor, serializer_t serializer, std::size_t cache_limit = 10)
         : storage_(storage)
         , constructor(constructor)
         , serializer(serializer)
+        , cache_limit(cache_limit)
     {}
 
     std::shared_ptr<Node> new_node(std::function<Node *(node_id)> construct)
     {
         node_id id = storage_.new_node();
         std::shared_ptr<Node> node(construct(id));
-        cached_nodes.push_back({id, node});
+        cached_nodes.emplace(id, node);
+        recently_used(id);
         return node;
     }
 
     std::shared_ptr<Node> operator[](const node_id & id)
     {
-        for (auto node : cached_nodes)
-            if (node.first == id)
-                return node.second;
+        auto it = cached_nodes.find(id);
+        if (it != cached_nodes.end())
+        {
+            remove_from_lru(id);
+            recently_used(id);
+            return it->second;
+        }
+
         return load_node(id);
     }
 
     void delete_node(const node_id & id)
     {
         storage_.delete_node(id);
-        auto it = std::find_if(cached_nodes.begin(), cached_nodes.end(),
-                               [id] (const cached_node & x) { return id == x.first; });
-        cached_nodes.erase(it);
+        cached_nodes.erase(id);
+        remove_from_lru(id);
     }
 
     void flush()
@@ -64,8 +71,16 @@ private:
     {
         std::shared_ptr<Stored> x = storage_.load_node(id);
         std::shared_ptr<Node> node(constructor(x.get(), *this));
-        cached_nodes.push_back({id, node});
-        return cached_nodes.back().second;
+        cached_nodes.emplace(id, node);
+        recently_used(id);
+        return node;
+    }
+
+    void write_node(const node_id & id)
+    {
+        std::shared_ptr<Node> node = cached_nodes[id];
+        std::shared_ptr<Stored> serialized(serializer(node.get()));
+        storage_.write_node(id, serialized.get());
     }
 
     void write_node(const node_id & id, Node * node)
@@ -73,10 +88,29 @@ private:
         storage_.write_node(id, node);
     }
 
+    void remove_from_lru(const node_id & id)
+    {
+        auto lru_it = std::find(last_recently_used.begin(), last_recently_used.end(), id);
+        last_recently_used.erase(lru_it);
+    }
+
+    void recently_used(const node_id & id)
+    {
+        if (last_recently_used.size() == cache_limit)
+        {
+            node_id flushed = last_recently_used.front();
+            last_recently_used.pop_front();
+            write_node(flushed);
+            cached_nodes.erase(flushed);
+        }
+        last_recently_used.push_back(id);
+    }
+
     basic_storage<Stored> & storage_;
     constructor_t constructor;
     serializer_t serializer;
-    using cached_node = std::pair<node_id, std::shared_ptr<Node>>;
-    std::list<cached_node> cached_nodes;
+    std::unordered_map<node_id, std::shared_ptr<Node>> cached_nodes;
+    std::size_t cache_limit;
+    std::list<node_id> last_recently_used;
 };
 }
