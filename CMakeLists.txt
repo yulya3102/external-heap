@@ -7,6 +7,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Boost REQUIRED)
 find_package(GTest REQUIRED)
 
+add_subdirectory(btree/serialize)
+
 set(STORAGE_SRC
     storage/memory.h
     storage/cache.h
@@ -15,7 +17,6 @@ set(STORAGE_SRC
 set(BTREE_SRC
     btree/btree_data.h
     btree/btree.h
-    btree/serialize/btree.pb.cc
 )
 
 add_executable(test_btree
@@ -23,7 +24,7 @@ add_executable(test_btree
     btree/btree_tests.cpp
 )
 
-target_link_libraries(test_btree ${GTEST_LIBRARY} protobuf)
+target_link_libraries(test_btree btree_serialize ${GTEST_LIBRARY})
 
 set(HEAP_SRC
     external_heap.h
@@ -31,4 +32,4 @@ set(HEAP_SRC
 
 add_executable(test_heap ${HEAP_SRC} ${BTREE_SRC} ${STORAGE_SRC} main.cpp)
 
-target_link_libraries(test_heap ${GTEST_LIBRARY} protobuf)
+target_link_libraries(test_heap btree_serialize ${GTEST_LIBRARY})
