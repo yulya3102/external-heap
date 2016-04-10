@@ -5,8 +5,8 @@
 #include <iostream>
 #include <functional>
 
-template <typename K, typename V, int t>
-std::vector<std::pair<K, V> > from_tree(bptree::b_tree<K, V, t> & tree)
+template <typename K, typename V>
+std::vector<std::pair<K, V>> from_tree(bptree::b_tree<K, V> & tree)
 {
     std::vector<std::pair<K, V> > v;
     auto out = std::back_inserter(v);
@@ -21,7 +21,7 @@ std::vector<std::pair<K, V> > from_tree(bptree::b_tree<K, V, t> & tree)
 TEST(btree, init)
 {
     storage::memory<detail::b_node_data<int, int>> mem;
-    bptree::b_tree<int, int, 3> tree(mem);
+    bptree::b_tree<int, int> tree(mem, 3);
     for (size_t i = 0; i < 10; ++i)
         tree.add(i, i);
     for (size_t i = 20; i < 30; ++i)
@@ -37,7 +37,7 @@ TEST(btree, init)
 TEST(btree, repeating)
 {
     storage::memory<detail::b_node_data<int, std::string>> mem;
-    bptree::b_tree<int, std::string, 3> tree(mem);
+    bptree::b_tree<int, std::string> tree(mem, 3);
 
     std::default_random_engine generator;
     std::uniform_int_distribution<std::int64_t> distribution(1, 1000);
@@ -74,7 +74,7 @@ TEST(btree, repeating)
 TEST(btree, random)
 {
     storage::memory<detail::b_node_data<int, std::string>> mem;
-    bptree::b_tree<int, std::string, 5> tree(mem);
+    bptree::b_tree<int, std::string> tree(mem, 5);
     std::vector<std::pair<int, std::string> > src, dest;
 
     std::default_random_engine generator;
@@ -107,7 +107,7 @@ TEST(btree, independent)
     std::function<int()> random = std::bind(distribution, generator);
 
     storage::memory<detail::b_node_data<int, int>> mem1;
-    bptree::b_tree<int, int, 6> tree1(mem1);
+    bptree::b_tree<int, int> tree1(mem1, 6);
     std::size_t size1 = random() * 100;
     for (std::size_t i = 0; i < size1; ++i)
     {
@@ -117,7 +117,7 @@ TEST(btree, independent)
 
     tree1.flush_cache();
     storage::memory<detail::b_node_data<int, int>> mem2(mem1);
-    bptree::b_tree<int, int, 6> tree2(mem2, tree1.root_id());
+    bptree::b_tree<int, int> tree2(mem2, 6, tree1.root_id());
     std::size_t size2 = random() * 10;
     for (std::size_t i = 0; i < size2; ++i)
     {

@@ -661,12 +661,14 @@ b_node<Key, Value> * node_constructor(b_node_data<Key, Value> * data, storage::c
 
 namespace bptree
 {
-template <typename Key, typename Value, int t>
+template <typename Key, typename Value>
 struct b_tree
 {
     b_tree(storage::memory<detail::b_node_data<Key, Value>> & storage,
+           std::size_t t,
            boost::optional<storage::node_id> root = boost::none)
         : nodes_(storage, detail::node_constructor<Key, Value>)
+        , t_(t)
         , root_(root)
     {}
 
@@ -690,7 +692,7 @@ struct b_tree
         do
         {
             // TODO: fix double move
-            r = (*r)->add(std::move(key), std::move(value), t, root_);
+            r = (*r)->add(std::move(key), std::move(value), t_, root_);
         }
         while (r);
     }
@@ -700,7 +702,7 @@ struct b_tree
     {
         b_node_ptr node = load_root();
 
-        for (auto x : node->remove_left_leaf(t, root_))
+        for (auto x : node->remove_left_leaf(t_, root_))
         {
             *out = std::move(x);
             ++out;
@@ -726,6 +728,7 @@ private:
     using b_buffer_ptr = typename detail::b_node<Key, Value>::b_buffer_ptr;
 
     storage::cache<detail::b_node<Key, Value>, detail::b_node_data<Key, Value>> nodes_;
+    std::size_t t_;
     boost::optional<storage::node_id> root_;
 
     using leaf_t = detail::b_leaf<Key, Value>;
