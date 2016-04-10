@@ -13,7 +13,7 @@ TEST(comparsion, all)
     data::heap<std::uint64_t, std::uint64_t> heap(1024);
 
     std::mt19937 generator;
-    std::uniform_int_distribution<std::uint64_t> distribution(1, 100000);
+    std::uniform_int_distribution<std::uint64_t> distribution(1, 1000);
 
     std::size_t size = distribution(generator);
     std::cout << "Size: " << size << " elements" << std::endl;
