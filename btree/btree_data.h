@@ -14,7 +14,7 @@ struct b_node_data
 {
     storage::node_id id_;
     boost::optional<storage::node_id> parent_;
-    std::size_t level_;
+    std::uint64_t level_;
 
     b_node_data()
     {

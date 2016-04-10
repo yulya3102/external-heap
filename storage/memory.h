@@ -5,7 +5,7 @@
 
 namespace storage
 {
-using node_id = std::size_t;
+using node_id = std::uint64_t;
 
 template <typename Node>
 struct memory
