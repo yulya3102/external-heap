@@ -9,11 +9,4 @@ find_package(GTest REQUIRED)
 
 add_subdirectory(storage)
 add_subdirectory(btree)
-
-set(HEAP_SRC
-    external_heap.h
-)
-
-add_executable(test_heap ${HEAP_SRC} storage main.cpp)
-
-target_link_libraries(test_heap btree ${GTEST_LIBRARY})
+add_subdirectory(heap)

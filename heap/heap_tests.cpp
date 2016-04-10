@@ -1,4 +1,4 @@
-#include "external_heap.h"
+#include "heap.h"
 
 #include <gtest/gtest.h>
 #include <utility>
