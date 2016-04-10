@@ -19,7 +19,7 @@ struct memory
         : copy_(other.copy_)
     {
         for (auto & x : other.storage_)
-            storage_[x.first].reset(x.second->copy_data());
+            storage_[x.first].reset(copy_(x.second.get()));
     }
 
     node_id new_node() const

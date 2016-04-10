@@ -1,6 +1,7 @@
 #pragma once
 
 #include "btree_data.h"
+#include "serialize.h"
 
 #include <vector>
 #include <map>
@@ -661,7 +662,7 @@ b_node<Key, Value, Serialized> * node_constructor(b_node_data<Key, Value> * data
 
 namespace bptree
 {
-template <typename Key, typename Value, typename Serialized = detail::b_node_data<Key, Value>>
+template <typename Key, typename Value, typename Serialized = std::string>
 struct b_tree
 {
     using data = detail::b_node_data<Key, Value>;
@@ -671,8 +672,8 @@ struct b_tree
     b_tree(storage::memory<Serialized> & storage,
            std::size_t t,
            boost::optional<storage::node_id> root = boost::none,
-           serializer_t serializer = [] (data * d) -> data * { return d; },
-           deserializer_t deserializer = [] (data * d) -> data * { return d; })
+           serializer_t serializer = bptree::serialize,
+           deserializer_t deserializer = bptree::deserialize)
         : nodes_(storage,
                  [deserializer] (Serialized * d, storage::cache<detail::b_node<Key, Value, Serialized>, Serialized> & cache)
                  { return detail::node_constructor<Key, Value, Serialized>(deserializer(d), cache); },
