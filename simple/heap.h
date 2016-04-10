@@ -36,12 +36,19 @@ struct heap
 
     std::pair<Key, Value> remove_min()
     {
-        undefined;
+        auto id = nodes_order.front();
+        auto node = nodes.load_node(id);
+        nodes.delete_node(id);
+
+        std::size_t x;
+        Key key = std::stoull(*node, &x);
+        Value value = std::stoull(node->substr(x));
+        return {key, value};
     }
 
     bool empty()
     {
-        undefined;
+        return nodes_order.empty();
     }
 
 private:
