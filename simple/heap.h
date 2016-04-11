@@ -5,6 +5,7 @@
 
 #include <utility>
 #include <algorithm>
+#include <deque>
 
 namespace simple
 {
@@ -30,7 +31,7 @@ struct heap
             Key a_key = std::stoull(*a_node);
             Key b_key = std::stoull(*b_node);
 
-            return a_key < b_key;
+            return a_key > b_key;
         });
     }
 
@@ -38,6 +39,7 @@ struct heap
     {
         auto id = nodes_order.front();
         auto node = nodes.load_node(id);
+        nodes_order.pop_front();
         nodes.delete_node(id);
 
         std::size_t x;
@@ -59,6 +61,6 @@ private:
     }
 
     storage::directory<std::string> nodes;
-    std::vector<Key> nodes_order;
+    std::deque<Key> nodes_order;
 };
 }
