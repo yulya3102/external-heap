@@ -10,7 +10,7 @@
 TEST(comparsion, all)
 {
     simple::heap<std::uint64_t, std::uint64_t> simple_heap;
-    data::heap<std::uint64_t, std::uint64_t> heap(1024);
+    data::heap<std::uint64_t, std::uint64_t> heap(8);
 
     std::mt19937 generator;
     std::uniform_int_distribution<std::uint64_t> distribution(1, 1000);

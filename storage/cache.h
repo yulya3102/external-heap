@@ -16,7 +16,7 @@ struct cache
     using constructor_t = std::function<Node *(Stored *, cache &)>;
     using serializer_t = std::function<Stored *(Node *)>;
 
-    cache(basic_storage<Stored> & storage, constructor_t constructor, serializer_t serializer, std::size_t cache_limit = 4096)
+    cache(basic_storage<Stored> & storage, constructor_t constructor, serializer_t serializer, std::size_t cache_limit = 8)
         : storage_(storage)
         , constructor(constructor)
         , serializer(serializer)
