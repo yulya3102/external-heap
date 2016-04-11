@@ -608,6 +608,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
     // else change tree structure and return root of the changed tree
     boost::optional<storage::node_id> flush(size_t t, boost::optional<storage::node_id> & tree_root)
     {
+        auto keep_me_alive = this->shared_from_this();
         while (!cached_this().pending_add_.empty())
         {
             auto x = std::move(cached_this().pending_add_.front());
@@ -673,6 +674,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
 
     virtual boost::optional<storage::node_id> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
+        auto keep_me_alive = this->shared_from_this();
         if (cached_this().pending_add_.size() >= t)
         {
             boost::optional<storage::node_id> r = cached_this().flush(t, tree_root);
