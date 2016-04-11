@@ -595,7 +595,6 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
             boost::optional<storage::node_id> r = b_internal<Key, Value, Serialized>::add(std::move(x.first), std::move(x.second), t, tree_root);
             if (r)
             {
-                assert(this->buffer(*r)->pending_add_.size() < t);
                 this->buffer(*r)->pending_add_.push(x);
                 return r;
             }
@@ -654,7 +653,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>, b_buffer_data<Key, Value>
 
     virtual boost::optional<storage::node_id> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        if (this->pending_add_.size() == t)
+        if (this->pending_add_.size() >= t)
         {
             boost::optional<storage::node_id> r = this->flush(t, tree_root);
             if (r)
