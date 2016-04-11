@@ -23,15 +23,9 @@ struct heap
         nodes.write_node(id, &s);
         nodes_order.push_back(id);
         std::make_heap(nodes_order.begin(), nodes_order.end(),
-                       [this] (Key a, Key b)
+                       [this] (storage::node_id a, storage::node_id b)
         {
-            auto a_node = nodes.load_node(a);
-            auto b_node = nodes.load_node(b);
-
-            Key a_key = std::stoull(*a_node);
-            Key b_key = std::stoull(*b_node);
-
-            return a_key > b_key;
+            return this->comparator(a, b);
         });
     }
 
@@ -39,8 +33,13 @@ struct heap
     {
         auto id = nodes_order.front();
         auto node = nodes.load_node(id);
-        nodes_order.pop_front();
         nodes.delete_node(id);
+        nodes_order.pop_front();
+        std::make_heap(nodes_order.begin(), nodes_order.end(),
+                       [this] (storage::node_id a, storage::node_id b)
+        {
+            return this->comparator(a, b);
+        });
 
         std::size_t x;
         Key key = std::stoull(*node, &x);
@@ -54,6 +53,17 @@ struct heap
     }
 
 private:
+    bool comparator(storage::node_id a, storage::node_id b)
+    {
+        auto a_node = nodes.load_node(a);
+        auto b_node = nodes.load_node(b);
+
+        Key a_key = std::stoull(*a_node);
+        Key b_key = std::stoull(*b_node);
+
+        return a_key > b_key;
+    }
+
     storage::node_id next_id() const
     {
         static storage::node_id id = 0;
@@ -61,6 +71,6 @@ private:
     }
 
     storage::directory<std::string> nodes;
-    std::deque<Key> nodes_order;
+    std::deque<storage::node_id> nodes_order;
 };
 }
