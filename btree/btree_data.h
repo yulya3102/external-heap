@@ -1,6 +1,6 @@
 #pragma once
 
-#include <storage/cache.h>
+#include <storage/node_id.h>
 
 #include <boost/optional.hpp>
 #include <exception>

@@ -1,11 +1,12 @@
 #pragma once
 
+#include "basic_storage.h"
+#include "node_id.h"
+
 #include <memory>
 
 namespace storage
 {
-using node_id = std::uint64_t;
-
 template <typename Serialized>
 struct basic_storage
 {
