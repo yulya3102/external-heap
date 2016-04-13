@@ -16,13 +16,6 @@ struct b_node_data
     boost::optional<storage::node_id> parent_;
     std::uint64_t level_;
 
-    b_node_data()
-    {
-        throw std::logic_error(
-            "b_node_data(): this constructor should never be called"
-        );
-    }
-
     b_node_data(const storage::node_id & id,
                 const boost::optional<storage::node_id> & parent,
                 std::size_t level)
@@ -37,7 +30,7 @@ struct b_node_data
 };
 
 template <typename Key, typename Value>
-struct b_leaf_data : virtual b_node_data<Key, Value>
+struct b_leaf_data : b_node_data<Key, Value>
 {
     std::vector<std::pair<Key, Value>> values_;
 
@@ -62,14 +55,24 @@ struct b_leaf_data : virtual b_node_data<Key, Value>
 };
 
 template <typename Key, typename Value>
-struct b_internal_data : virtual b_node_data<Key, Value>
+struct b_internal_data : b_node_data<Key, Value>
 {
     std::vector<Key> keys_;
     std::vector<storage::node_id> children_;
 
-    b_internal_data(const std::vector<Key> & keys,
+    b_internal_data(const storage::node_id & id,
+                    const boost::optional<storage::node_id> & parent,
+                    std::size_t level)
+        : b_node_data<Key, Value>(id, parent, level)
+    {}
+
+    b_internal_data(const storage::node_id & id,
+                    const boost::optional<storage::node_id> & parent,
+                    std::size_t level,
+                    const std::vector<Key> & keys,
                     const std::vector<storage::node_id> & children)
-        : keys_(keys)
+        : b_node_data<Key, Value>(id, parent, level)
+        , keys_(keys)
         , children_(children)
     {}
 
@@ -77,13 +80,13 @@ struct b_internal_data : virtual b_node_data<Key, Value>
 };
 
 template <typename Key, typename Value>
-struct b_buffer_data : virtual b_internal_data<Key, Value>
+struct b_buffer_data : b_internal_data<Key, Value>
 {
     std::queue<std::pair<Key, Value> > pending_add_;
 
     b_buffer_data(const storage::node_id & id,
                   std::size_t level)
-        : b_node_data<Key, Value>(id, boost::none, level)
+        : b_internal_data<Key, Value>(id, boost::none, level)
     {}
 
     b_buffer_data(const storage::node_id & id,
@@ -92,8 +95,7 @@ struct b_buffer_data : virtual b_internal_data<Key, Value>
                   const std::vector<Key> & keys,
                   const std::vector<storage::node_id> & children,
                   const std::queue<std::pair<Key, Value>> & pending)
-        : b_node_data<Key, Value>(id, parent, level)
-        , b_internal_data<Key, Value>(keys, children)
+        : b_internal_data<Key, Value>(id, parent, level, keys, children)
         , pending_add_(pending)
     {}
 
