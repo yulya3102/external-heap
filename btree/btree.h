@@ -208,7 +208,7 @@ struct b_leaf : b_node<Key, Value, Serialized>
 
     virtual storage::node_id new_brother() const
     {
-        return this->storage_.new_node([] (storage::node_id id, cache_t & cache) { return new b_leaf_data<Key, Value>(id); })->id_;
+        return this->storage_.new_node([] (storage::node_id id) { return new b_leaf_data<Key, Value>(id); })->id_;
     }
 
     virtual ~b_leaf() = default;
@@ -597,7 +597,7 @@ struct b_buffer : b_internal<Key, Value, Serialized>
     {
         return std::dynamic_pointer_cast<b_buffer_data<Key, Value>>(
                     cache.new_node(
-                        [level] (storage::node_id id, cache_t & cache)
+                        [level] (storage::node_id id)
                         { return new b_buffer_data<Key, Value>(id, level); }
                     ));
     }
@@ -813,7 +813,7 @@ private:
     {
         if (!root_)
         {
-            b_node_ptr root = nodes_.new_node([] (storage::node_id id, cache_t & cache) { return new detail::b_leaf_data<Key, Value>(id); });
+            b_node_ptr root = nodes_.new_node([] (storage::node_id id) { return new detail::b_leaf_data<Key, Value>(id); });
             root_ = root->id_;
             return root;
         }
