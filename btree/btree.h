@@ -38,7 +38,7 @@ template <typename Key, typename Value, typename Serialized>
 std::shared_ptr<b_node<Key, Value, Serialized>> node_constructor(const b_node_data<Key, Value> & data, storage::cache<b_node_data<Key, Value>, Serialized> & cache);
 
 template <typename Key, typename Value, typename Serialized>
-struct b_node : std::enable_shared_from_this<b_node<Key, Value, Serialized>>
+struct b_node
 {
     using b_node_ptr = std::shared_ptr<b_node>;
     using b_internal_ptr = std::shared_ptr<b_internal<Key, Value, Serialized>>;
@@ -612,7 +612,6 @@ struct b_buffer : b_internal<Key, Value, Serialized>
     // else change tree structure and return root of the changed tree
     boost::optional<storage::node_id> flush(size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        auto keep_me_alive = this->shared_from_this();
         while (!cached_this().pending_add_.empty())
         {
             auto x = std::move(cached_this().pending_add_.front());
@@ -678,7 +677,6 @@ struct b_buffer : b_internal<Key, Value, Serialized>
 
     virtual boost::optional<storage::node_id> add(Key && key, Value && value, size_t t, boost::optional<storage::node_id> & tree_root)
     {
-        auto keep_me_alive = this->shared_from_this();
         if (cached_this().pending_add_.size() >= t)
         {
             boost::optional<storage::node_id> r = this->flush(t, tree_root);
