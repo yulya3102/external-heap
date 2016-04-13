@@ -13,12 +13,12 @@ namespace storage
 template <typename Node, typename Stored>
 struct cache
 {
-    using constructor_t = std::function<Node *(Stored *, cache &)>;
+    using deserializer_t = std::function<Node *(Stored *)>;
     using serializer_t = std::function<Stored *(Node *)>;
 
-    cache(basic_storage<Stored> & storage, constructor_t constructor, serializer_t serializer, std::size_t cache_limit = 3)
+    cache(basic_storage<Stored> & storage, deserializer_t deserializer, serializer_t serializer, std::size_t cache_limit = 3)
         : storage_(storage)
-        , constructor(constructor)
+        , deserializer(deserializer)
         , serializer(serializer)
         , cache_limit(cache_limit)
     {}
@@ -70,7 +70,7 @@ private:
     std::shared_ptr<Node> load_node(const node_id & id)
     {
         std::shared_ptr<Stored> x = storage_.load_node(id);
-        std::shared_ptr<Node> node(constructor(x.get(), *this));
+        std::shared_ptr<Node> node(deserializer(x.get()));
         cached_nodes.emplace(id, node);
         recently_used(id);
         return node;
@@ -107,7 +107,7 @@ private:
     }
 
     basic_storage<Stored> & storage_;
-    constructor_t constructor;
+    deserializer_t deserializer;
     serializer_t serializer;
     std::unordered_map<node_id, std::shared_ptr<Node>> cached_nodes;
     std::size_t cache_limit;
